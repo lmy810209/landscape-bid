@@ -36,6 +36,11 @@ export type BacktestRow = {
   myError: number | null; // |내 투찰률 - 실제 사정율|
   improvement: number | null; // myError - errors.min (양수면 도구가 더 가까웠음)
   isRunnerUp: boolean; // 2등 공고 (도이접 케이스)
+  isUnderThreshold: boolean; // result_status === '낙찰하한선미달'
+  // 부적격 케이스에 한해: 보수형 rate >= actualWinRatio 인지.
+  // true이면 도구의 보수형을 따랐을 때 1등보다도 위에 있었으므로 낙찰하한선 미달을 거의 확실히 회피했을 것.
+  // 부적격이 아니거나 strategies 미산출 시 null.
+  underThresholdAvoidable: boolean | null;
 };
 
 export type BacktestSummary = {
@@ -65,6 +70,11 @@ export type BacktestSummary = {
   runnerUpEvaluatedCount: number;
   runnerUpImprovedCount: number;
   runnerUpImprovementRate: number | null;
+
+  // 낙찰하한선미달(부적격) 한정 — 도구의 보수형을 따랐다면 회피 가능했을지
+  underThresholdTotal: number;
+  underThresholdAvoidableCount: number;
+  underThresholdAvoidableRate: number | null;
 };
 
 export type BacktestResult = {
@@ -82,6 +92,7 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
   const actualWinRatio = calcWinRatio(target);
   const myBidRatio = calcMyBidRatio(target);
   const isRunnerUp = target.result_status === "2등";
+  const isUnderThreshold = target.result_status === "낙찰하한선미달";
 
   // 실제 낙찰 결과가 없는 공고는 검증 자체가 불가능
   if (actualWinRatio == null) {
@@ -98,6 +109,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
       myError: null,
       improvement: null,
       isRunnerUp,
+      isUnderThreshold,
+      underThresholdAvoidable: null,
     };
   }
 
@@ -126,6 +139,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
       myError: null,
       improvement: null,
       isRunnerUp,
+      isUnderThreshold,
+      underThresholdAvoidable: null,
     };
   }
 
@@ -149,6 +164,12 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
   const myError = myBidRatio != null ? Math.abs(myBidRatio - actualWinRatio) : null;
   const improvement = myError != null ? myError - minErr : null;
 
+  // 부적격 회피 가능 판정: 보수형 rate >= 1등 사정율이면 1등보다 위에서 형성됨
+  // → 1등이 하한선을 통과한 케이스이므로 그 위는 거의 확실히 하한선 통과.
+  const underThresholdAvoidable = isUnderThreshold
+    ? strategies.conservative.rate >= actualWinRatio
+    : null;
+
   return {
     bid: target,
     status: "evaluated",
@@ -168,6 +189,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
     myError,
     improvement,
     isRunnerUp,
+    isUnderThreshold,
+    underThresholdAvoidable,
   };
 }
 
@@ -198,6 +221,9 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
       runnerUpEvaluatedCount: 0,
       runnerUpImprovedCount: 0,
       runnerUpImprovementRate: null,
+      underThresholdTotal: 0,
+      underThresholdAvoidableCount: 0,
+      underThresholdAvoidableRate: null,
     };
   }
 
@@ -228,6 +254,15 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
       ? runnerUpImprovedCount / runnerUpEvaluated.length
       : null;
 
+  // 부적격(낙찰하한선미달) 한정 — 도구의 보수형을 따랐다면 회피 가능했을 비율
+  const underThresholdRows = evaluated.filter((r) => r.isUnderThreshold);
+  const underThresholdTotal = underThresholdRows.length;
+  const underThresholdAvoidableCount = underThresholdRows.filter(
+    (r) => r.underThresholdAvoidable === true,
+  ).length;
+  const underThresholdAvoidableRate =
+    underThresholdTotal > 0 ? underThresholdAvoidableCount / underThresholdTotal : null;
+
   return {
     totalBids,
     evaluatedCount,
@@ -242,6 +277,9 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
     runnerUpEvaluatedCount: runnerUpEvaluated.length,
     runnerUpImprovedCount,
     runnerUpImprovementRate,
+    underThresholdTotal,
+    underThresholdAvoidableCount,
+    underThresholdAvoidableRate,
   };
 }
 

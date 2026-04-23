@@ -141,6 +141,25 @@ export default async function BacktestPage() {
                     : "neutral"
                 }
               />
+              <Card
+                label="부적격 회피 가능 비율"
+                value={
+                  summary.underThresholdAvoidableRate != null
+                    ? formatPercent(summary.underThresholdAvoidableRate)
+                    : "—"
+                }
+                sub={
+                  summary.underThresholdTotal > 0
+                    ? `낙찰하한선미달 ${summary.underThresholdTotal}건 중 ${summary.underThresholdAvoidableCount}건은 보수형 추천이 1등 사정율 위였음 (회피 가능)`
+                    : "낙찰하한선미달 평가 건 없음"
+                }
+                tone={
+                  summary.underThresholdAvoidableRate != null &&
+                  summary.underThresholdAvoidableRate >= 0.5
+                    ? "good"
+                    : "neutral"
+                }
+              />
             </div>
           </section>
 
@@ -205,6 +224,11 @@ function SummaryStatement({
   if (summary.runnerUpEvaluatedCount > 0 && summary.runnerUpImprovementRate != null) {
     sentences.push(
       `2등 공고 ${summary.runnerUpEvaluatedCount}건만 한정하면 도구 우위 비율은 ${formatPercent(summary.runnerUpImprovementRate)}입니다.`,
+    );
+  }
+  if (summary.underThresholdTotal > 0 && summary.underThresholdAvoidableRate != null) {
+    sentences.push(
+      `낙찰하한선미달 ${summary.underThresholdTotal}건 중 보수형 추천이 1등 사정율 위였던 (회피 가능했을) 비율은 ${formatPercent(summary.underThresholdAvoidableRate)}입니다.`,
     );
   }
 
@@ -281,6 +305,13 @@ function Row({ row }: { row: BacktestRow }) {
           {row.isRunnerUp && (
             <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">
               2등
+            </span>
+          )}
+          {row.isUnderThreshold && (
+            <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+              낙찰하한선미달
+              {row.underThresholdAvoidable === true && " · 회피 가능"}
+              {row.underThresholdAvoidable === false && " · 회피 불가"}
             </span>
           )}
         </div>

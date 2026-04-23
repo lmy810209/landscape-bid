@@ -122,10 +122,11 @@ const SYSTEM_PROMPT = `당신은 한국 조달청 나라장터 개찰결과 PDF�
     rank: 그 행의 "순위" (부적격/낙찰하한선 미달 등으로 순위 컬럼이 비어 있으면 null로 두되 found는 true 유지),
     bid_amount: 그 행의 "투찰금액(원)",
     matched_company_name: 그 행의 "업체명",
-    note: 그 행의 "비고" 컬럼 값 그대로 (예: "정상", "낙찰하한선 미달", "부적격" 등). 비어 있으면 null
+    note: 그 행의 "비고(remark)" 컬럼 값을 **반드시 원문 그대로** 보존 (예: "정상", "낙찰하한선 미달", "사정율 미달", "부적격", "적격심사 부적격"). 비어 있거나 "-"이면 null
   }
 - 매칭 실패(본문 어디에도 그 회사 없음 = 미참여): my_match = { found: false, rank: null, bid_amount: null, matched_company_name: null, note: null }
 - 핵심: 회사명/사업자번호가 보이는데 순위만 비어있으면 found: true + rank: null. 절대 found: false로 두지 말 것.
+- 핵심: 비고에 "낙찰하한선 미달", "사정율 미달", "사정률 미달", "부적격" 같은 표현이 있으면 **글자/띄어쓰기 그대로** 옮길 것. 임의 요약/축약 금지 (정규식 매칭으로 후처리 분류함).
 - 매칭이 모호하면 found: false로 두세요. 추측 금지.
 
 [금지]

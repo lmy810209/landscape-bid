@@ -29,7 +29,7 @@ create table public.bids (
   winning_amount       numeric(18,0),                              -- 낙찰가 (1등)
   second_amount        numeric(18,0),                              -- 2등 금액
   result_status        text          not null
-                       check (result_status in ('낙찰','2등','순위권밖','미참여','유찰')),
+                       check (result_status in ('낙찰','2등','순위권밖','낙찰하한선미달','미참여','유찰')),
 
   -- 메타
   note                 text,                                       -- 특이사항

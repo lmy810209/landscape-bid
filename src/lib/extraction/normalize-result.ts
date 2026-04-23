@@ -50,11 +50,24 @@ function normalizeDate(raw: string | null): string | null {
   return null;
 }
 
+// 비고 컬럼에 부적격/낙찰하한선 미달 신호가 있는지 정규식으로 판정.
+// 표현 다양성 대비: "낙찰하한선 미달" / "낙찰하한율 미달" / "사정율 미달" / "사정률 미달" / "부적격" / "적격심사 부적격" 등
+const UNDER_THRESHOLD_PATTERN = /낙찰하한|사정\s*[율률]\s*미달|부적격/;
+
+function isNoteUnderThreshold(note: string | null): boolean {
+  if (!note) return false;
+  return UNDER_THRESHOLD_PATTERN.test(note);
+}
+
+// 우선순위:
+//  1) 본문에 회사 미발견 → 미참여
+//  2) 비고에 부적격/낙찰하한선 미달 신호 → 낙찰하한선미달 (rank보다 우선)
+//  3) rank == 1 → 낙찰
+//  4) rank == 2 → 2등
+//  5) 그 외(rank ≥ 3 또는 rank null but no signal) → 순위권밖
 function deriveResultStatus(myMatch: RawResultExtraction["my_match"]): ResultStatus {
-  // 본문에서 못 찾았으면 미참여
   if (!myMatch.found) return "미참여";
-  // 매칭됐는데 순위가 비어있는 경우 (부적격/낙찰하한선 미달 등) → 참여는 했으니 순위권밖
-  if (myMatch.rank == null) return "순위권밖";
+  if (isNoteUnderThreshold(myMatch.note)) return "낙찰하한선미달";
   if (myMatch.rank === 1) return "낙찰";
   if (myMatch.rank === 2) return "2등";
   return "순위권밖";

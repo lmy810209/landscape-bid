@@ -171,9 +171,11 @@ function ResultBadge({ status }: { status: string }) {
       ? "bg-green-100 text-green-700"
       : status === "2등"
         ? "bg-blue-100 text-blue-700"
-        : status === "유찰"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-slate-100 text-slate-600";
+        : status === "낙찰하한선미달"
+          ? "bg-red-100 text-red-700"
+          : status === "유찰"
+            ? "bg-amber-100 text-amber-700"
+            : "bg-slate-100 text-slate-600";
   return <span className={`rounded px-2 py-0.5 text-xs ${cls}`}>{status}</span>;
 }
 
