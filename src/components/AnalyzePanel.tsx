@@ -6,6 +6,7 @@ import { WORK_TYPES } from "@/types/bid";
 import { formatKRW, formatPercent } from "@/lib/analysis/calculations";
 import {
   BIN_SIZE,
+  MIN_FOR_CONDITIONAL,
   RANGE_EXPAND_THRESHOLD,
   RECENT_COUNT,
   RECENT_WEIGHT,
@@ -16,6 +17,11 @@ import {
   type Risk,
   type RiskLevel,
 } from "@/lib/analysis/recommendation";
+import {
+  calculateBidStrategies,
+  type BidStrategies,
+  type StrategyOption,
+} from "@/lib/analysis/strategy";
 
 type Props = {
   bids: Bid[];
@@ -71,6 +77,20 @@ export default function AnalyzePanel({ bids, agencyOptions, workTypeOptions, ini
     () => analyzeNotice(input, bids),
     [input, bids],
   );
+
+  // 추천 구간이 도출됐고 표본이 최소 임계 이상일 때만 전략 계산.
+  // 그 외에는 null → UI에서 "전략 계산 불가" 카드로 폴백.
+  const strategies: BidStrategies | null = useMemo(() => {
+    if (!result.range) return null;
+    if (result.sampleCount < MIN_FOR_CONDITIONAL) return null;
+    return calculateBidStrategies({
+      range: result.range,
+      baseAmount: input.base_amount,
+      sampleCount: result.sampleCount,
+      myGapRateMean: result.myGapRateMean,
+      participantCount: input.participant_count,
+    });
+  }, [result, input.base_amount, input.participant_count]);
 
   const filled = !!(input.agency && input.work_type);
 
@@ -191,6 +211,8 @@ export default function AnalyzePanel({ bids, agencyOptions, workTypeOptions, ini
             <StatusBanner status={result.status} reason={result.reason} />
 
             <SummaryBox text={result.summary} />
+
+            <StrategiesSection strategies={strategies} />
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Card
@@ -325,6 +347,98 @@ function SummaryBox({ text }: { text: string }) {
     <div className="rounded border bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
       <div className="mb-1 text-xs font-semibold text-slate-500">결과 요약</div>
       {text}
+    </div>
+  );
+}
+
+function StrategiesSection({ strategies }: { strategies: BidStrategies | null }) {
+  if (!strategies) {
+    return (
+      <div className="rounded border border-slate-200 bg-white p-4">
+        <h3 className="mb-1 text-sm font-semibold">투찰 전략 옵션</h3>
+        <p className="text-sm text-slate-500">
+          추천 구간이 도출되지 않아 전략 계산이 불가합니다. 동일 발주처/공종 데이터를
+          더 축적한 뒤 다시 시도하세요.
+        </p>
+      </div>
+    );
+  }
+
+  const { aggressive, balanced, conservative, meta } = strategies;
+  const adjustments: string[] = [];
+  if (meta.gapAdjustmentApplied !== 0) {
+    const sign = meta.gapAdjustmentApplied > 0 ? "+" : "";
+    adjustments.push(
+      `my_gap_rate 보정 ${sign}${(meta.gapAdjustmentApplied * 100).toFixed(3)}%p (모든 옵션)`,
+    );
+  }
+  if (meta.competitionAdjustmentApplied !== 0) {
+    adjustments.push(
+      `경쟁 강도 보정 ${(meta.competitionAdjustmentApplied * 100).toFixed(3)}%p (균형형만, 참가 ${meta.participantCount}개)`,
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end justify-between">
+        <div>
+          <h3 className="text-sm font-semibold">투찰 전략 옵션 (참고값)</h3>
+          <p className="text-xs text-slate-500">
+            추천 구간 내 위치 기반 3가지 옵션. 단일 정답이 아니라 참고용 전략입니다.
+          </p>
+        </div>
+        <div className="text-right text-xs text-slate-500">표본 {meta.sampleCount}건</div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StrategyCard option={aggressive} tone="aggressive" />
+        <StrategyCard option={balanced} tone="balanced" />
+        <StrategyCard option={conservative} tone="conservative" />
+      </div>
+
+      {adjustments.length > 0 && (
+        <div className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+          <span className="font-semibold">적용된 보정: </span>
+          {adjustments.join(" · ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StrategyCard({
+  option,
+  tone,
+}: {
+  option: StrategyOption;
+  tone: "aggressive" | "balanced" | "conservative";
+}) {
+  const toneCls = {
+    aggressive: "border-red-200 bg-red-50/40",
+    balanced: "border-blue-300 bg-blue-50/40",
+    conservative: "border-emerald-200 bg-emerald-50/40",
+  }[tone];
+  const badgeCls = {
+    aggressive: "bg-red-100 text-red-700",
+    balanced: "bg-blue-100 text-blue-700",
+    conservative: "bg-emerald-100 text-emerald-700",
+  }[tone];
+
+  return (
+    <div className={`rounded border p-4 ${toneCls}`}>
+      <div className="mb-2 flex items-center justify-between">
+        <span className={`rounded px-2 py-0.5 text-xs font-semibold ${badgeCls}`}>
+          {option.label}
+        </span>
+        <span className="text-xs text-slate-500">사정율</span>
+      </div>
+      <div className="text-2xl font-semibold tabular-nums">
+        {(option.rate * 100).toFixed(3)}%
+      </div>
+      <div className="mt-1 text-sm tabular-nums text-slate-700">
+        예상 투찰가 {option.bidAmount != null ? `${option.bidAmount.toLocaleString("ko-KR")}원` : "—"}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-slate-600">{option.description}</p>
     </div>
   );
 }
