@@ -81,8 +81,8 @@ export default async function HomePage({
           />
           <Card
             label="2등 차이값 (평균)"
-            value={formatPercent(rec.diffRateMean)}
-            sub={`표본 ${rec.diffSampleCount}건 — 미세 조정 참고`}
+            value={formatPercent(rec.runnerUpGapRateMean)}
+            sub={`표본 ${rec.runnerUpGapSampleCount}건 — 미세 조정 참고`}
           />
           <Card
             label="데이터 근거"
