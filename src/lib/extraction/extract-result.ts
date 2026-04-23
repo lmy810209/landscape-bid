@@ -26,6 +26,10 @@ export const ResultExtractedSchema = z.object({
     rank: z.number().int().nullable(),
     bid_amount: z.number().nullable(),
     matched_company_name: z.string().nullable(),
+    // "비고" 컬럼 값 (예: "정상", "낙찰하한선 미달", "부적격" 등)
+    // 부적격이면 보통 순위 컬럼이 비어있어 rank=null이지만 참여는 한 것이므로
+    // note 정보가 분석에 매우 중요.
+    note: z.string().nullable(),
   }),
 });
 
@@ -53,8 +57,9 @@ const RESPONSE_SCHEMA = {
         rank: { type: Type.INTEGER, nullable: true },
         bid_amount: { type: Type.NUMBER, nullable: true },
         matched_company_name: { type: Type.STRING, nullable: true },
+        note: { type: Type.STRING, nullable: true },
       },
-      required: ["found", "rank", "bid_amount", "matched_company_name"],
+      required: ["found", "rank", "bid_amount", "matched_company_name", "note"],
     },
   },
   required: [
@@ -112,8 +117,15 @@ const SYSTEM_PROMPT = `당신은 한국 조달청 나라장터 개찰결과 PDF�
 - 식별자는 사업자등록번호(예: "495-86-03422") 또는 회사명("(주)새빛조경") 형태
 - 사업자등록번호 정확 일치 우선 (가장 신뢰도 높음)
 - 회사명 매칭은 (주)/주식회사/공백 등을 무시한 부분 일치 허용
-- 매칭 성공: my_match = { found: true, rank: 그 행의 "순위", bid_amount: 그 행의 "투찰금액(원)", matched_company_name: 그 행의 "업체명" }
-- 매칭 실패(미참여 또는 본문에 없음): my_match = { found: false, rank: null, bid_amount: null, matched_company_name: null }
+- 매칭 성공: my_match = {
+    found: true,
+    rank: 그 행의 "순위" (부적격/낙찰하한선 미달 등으로 순위 컬럼이 비어 있으면 null로 두되 found는 true 유지),
+    bid_amount: 그 행의 "투찰금액(원)",
+    matched_company_name: 그 행의 "업체명",
+    note: 그 행의 "비고" 컬럼 값 그대로 (예: "정상", "낙찰하한선 미달", "부적격" 등). 비어 있으면 null
+  }
+- 매칭 실패(본문 어디에도 그 회사 없음 = 미참여): my_match = { found: false, rank: null, bid_amount: null, matched_company_name: null, note: null }
+- 핵심: 회사명/사업자번호가 보이는데 순위만 비어있으면 found: true + rank: null. 절대 found: false로 두지 말 것.
 - 매칭이 모호하면 found: false로 두세요. 추측 금지.
 
 [금지]

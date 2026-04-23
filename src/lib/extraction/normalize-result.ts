@@ -51,7 +51,10 @@ function normalizeDate(raw: string | null): string | null {
 }
 
 function deriveResultStatus(myMatch: RawResultExtraction["my_match"]): ResultStatus {
-  if (!myMatch.found || myMatch.rank == null) return "미참여";
+  // 본문에서 못 찾았으면 미참여
+  if (!myMatch.found) return "미참여";
+  // 매칭됐는데 순위가 비어있는 경우 (부적격/낙찰하한선 미달 등) → 참여는 했으니 순위권밖
+  if (myMatch.rank == null) return "순위권밖";
   if (myMatch.rank === 1) return "낙찰";
   if (myMatch.rank === 2) return "2등";
   return "순위권밖";
@@ -106,7 +109,9 @@ export function normalizeResultExtraction(raw: RawResultExtraction): NormalizedR
       winning_amount: normalizeAmount(raw.winning_amount),
       second_amount: normalizeAmount(raw.second_amount),
       result_status: deriveResultStatus(raw.my_match),
-      note: null,
+      // 매칭 행의 "비고" 컬럼 값(예: "낙찰하한선 미달")을 note로 자동 채움.
+      // 이건 분석 시 부적격/유효 구분에 매우 중요한 신호이므로 반드시 보존.
+      note: normalizeString(raw.my_match.note),
     },
     myMatch: {
       found: raw.my_match.found,
