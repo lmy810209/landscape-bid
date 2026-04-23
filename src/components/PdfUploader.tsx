@@ -43,8 +43,9 @@ export default function PdfUploader({ onExtracted }: Props) {
       <div>
         <h2 className="text-sm font-semibold">📄 공고 PDF 자동 추출</h2>
         <p className="text-xs text-slate-500">
-          PDF 업로드 시 Claude가 핵심 필드를 추출해 폼에 자동 입력합니다.
+          공고문 PDF를 올리면 Gemini가 핵심 필드를 추출해 분석 폼에 자동 입력합니다.
           추출된 값은 자유롭게 수정 가능하며, 실패 시 수동 입력으로 진행할 수 있습니다.
+          (※ 이 화면은 분석만 수행하며 저장하지 않습니다. 과거 결과 등록은 "입찰 등록" 메뉴에서 하세요.)
         </p>
       </div>
       <input
