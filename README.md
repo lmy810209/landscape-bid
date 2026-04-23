@@ -30,8 +30,9 @@ src/
     bids/page.tsx         # 입찰 목록
     bids/[id]/page.tsx    # 입찰 상세
     bids/new/page.tsx     # 입찰 등록
+    backtest/page.tsx     # Leave-One-Out 백테스트 검증
     api/bids/             # CRUD 라우트
-    api/extract-pdf/      # PDF → Claude 추출 라우트
+    api/extract-pdf/      # PDF → Gemini 추출 라우트
   components/
     BidForm.tsx
     FilterBar.tsx
@@ -44,6 +45,7 @@ src/
       calculations.ts     # 사정율/투찰률/my_gap_rate/runner_up_gap_rate
       recommendation.ts   # 분포·가중치·추천 구간·analyzeNotice·Risk
       strategy.ts         # 추천 구간 → 투찰 전략 옵션 3종 (공격/균형/보수)
+      backtest.ts         # Leave-One-Out 검증 (recommendation+strategy 재사용)
     extraction/
       extract.ts          # Gemini 2.5 Flash + responseSchema + Zod 검증
       normalize.ts        # work_type 매핑, 날짜/금액 정규화
@@ -164,6 +166,23 @@ work_type은 Gemini가 `[유지관리, 식재, 조경시설물, 기타]` 4종으
 모든 결과는 `[low, high]` 범위로 clamp되어 추천 구간을 절대 벗어나지 않습니다.
 
 표본이 `MIN_FOR_CONDITIONAL` (2건) 미만이거나 추천 구간이 도출되지 않으면 전략 카드 대신 "전략 계산 불가" 안내가 표시됩니다.
+
+## 백테스트 검증 (`/backtest`)
+
+각 공고를 학습 데이터에서 1건씩 떼어내고(Leave-One-Out), 동일 발주처/공종의 나머지로 추천 구간/전략을 산출한 뒤 실제 낙찰 사정율과 비교합니다 ([backtest.ts](src/lib/analysis/backtest.ts)).
+
+지표:
+- **추천 구간 포함률**: 평가 케이스 중 실제 사정율이 추천 구간 안에 들어온 비율
+- **전략별 평균 오차**: |공격형 - 실제| / |균형형 - 실제| / |보수형 - 실제| 절대값 평균
+- **최소 오차 평균**: 매번 3개 중 최선을 골랐다고 가정한 이론치 (도구의 상한)
+- **내 투찰 평균 오차** vs **개선된 비율**: 도구의 최소 오차가 내 실제 오차보다 작은 케이스 비율
+- **2등 공고 도이접 개선**: result_status='2등' 공고만 한정해 도구 우위 비율 (도이접 케이스가 핵심 검증 대상)
+
+원칙:
+- 검증 대상 공고는 절대 학습 데이터에 포함하지 않음 (id 기준 제외)
+- 단일 정답 정확도가 아니라 도구의 분포적 안정성을 평가
+- recommendation.ts와 strategy.ts를 그대로 재사용 (룰 일관성)
+- 표본 < `MIN_FOR_CONDITIONAL`(2건)이면 평가 불가 → "표본 부족"으로 분리 집계
 
 ## 다음 단계 로드맵
 

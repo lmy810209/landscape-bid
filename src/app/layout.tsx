@@ -25,6 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/bids/new" className="text-sm text-slate-600 hover:text-slate-900">
               입찰 등록
             </Link>
+            <Link href="/backtest" className="text-sm text-slate-600 hover:text-slate-900">
+              백테스트
+            </Link>
           </nav>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
