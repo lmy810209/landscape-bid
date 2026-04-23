@@ -32,14 +32,18 @@ src/
     bids/new/page.tsx     # 입찰 등록
     backtest/page.tsx     # Leave-One-Out 백테스트 검증
     api/bids/             # CRUD 라우트
-    api/extract-pdf/      # PDF → Gemini 추출 라우트
+    api/extract-pdf/      # 공고문 PDF → Gemini 추출
+    api/extract-result-pdf/  # 개찰결과 PDF → Gemini 추출 + 내 회사 매칭
   components/
     BidForm.tsx
+    BidEntryWithUpload.tsx  # 개찰결과 PDF 업로더 + BidForm wrapper
+    ResultPdfUploader.tsx   # 개찰결과 PDF 업로드 (내 회사 식별자 포함)
     FilterBar.tsx
-    AnalyzePanel.tsx      # 단건 분석 폼 + 결과
-    AnalyzeWithUpload.tsx # PdfUploader + AnalyzePanel wrapper
-    PdfUploader.tsx       # PDF 업로드 + /api/extract-pdf 호출
+    AnalyzePanel.tsx        # 단건 분석 폼 + 결과
+    AnalyzeWithUpload.tsx   # PdfUploader + AnalyzePanel wrapper
+    PdfUploader.tsx         # 공고문 PDF 업로드 + /api/extract-pdf 호출
   lib/
+    config/myCompany.ts   # 내 회사 식별자 (기본값 + localStorage 저장)
     supabase/{client,server}.ts
     analysis/
       calculations.ts     # 사정율/투찰률/my_gap_rate/runner_up_gap_rate
@@ -47,8 +51,10 @@ src/
       strategy.ts         # 추천 구간 → 투찰 전략 옵션 3종 (공격/균형/보수)
       backtest.ts         # Leave-One-Out 검증 (recommendation+strategy 재사용)
     extraction/
-      extract.ts          # Gemini 2.5 Flash + responseSchema + Zod 검증
-      normalize.ts        # work_type 매핑, 날짜/금액 정규화
+      extract.ts          # 공고문 PDF: Gemini 2.5 Flash + responseSchema + Zod
+      extract-result.ts   # 개찰결과 PDF: 공고+1등/2등/참가수+내 회사 매칭
+      normalize.ts        # 공고 추출 정규화
+      normalize-result.ts # 결과 추출 → BidInput-shape (순위→result_status)
   types/bid.ts            # Bid + RESULT_STATUSES + WORK_TYPES
 supabase/schema.sql
 ```
@@ -184,11 +190,25 @@ work_type은 Gemini가 `[유지관리, 식재, 조경시설물, 기타]` 4종으
 - recommendation.ts와 strategy.ts를 그대로 재사용 (룰 일관성)
 - 표본 < `MIN_FOR_CONDITIONAL`(2건)이면 평가 불가 → "표본 부족"으로 분리 집계
 
+## 개찰결과 PDF 자동 등록 (`/bids/new`)
+
+`/bids/new` 상단의 업로더에 나라장터 개찰결과 PDF를 올리면:
+
+1. 서버에서 `pdf-parse`로 텍스트 추출 (전반부 15,000자)
+2. **Gemini 2.5 Flash**가 공고 정보 + 1등/2등 + 참가수 + **내 회사 매칭** 한 번에 추출
+3. 매칭 결과로 `result_status` 자동 결정:
+   - 매칭 + rank=1 → `낙찰`
+   - 매칭 + rank=2 → `2등`
+   - 매칭 + rank≥3 → `순위권밖`
+   - 매칭 실패 → `미참여`
+4. BidForm에 자동 prefill → 사용자가 검토 후 저장 한 번이면 끝
+
+내 회사 식별자(사업자등록번호/회사명)는 [src/lib/config/myCompany.ts](src/lib/config/myCompany.ts)에 기본값이 박혀있고, 업로더 UI에서 변경 시 localStorage에 저장됩니다 (단일 사용자 가정).
+
 ## 다음 단계 로드맵
 
-1. **공고 선택 점수**: 면허/시평/지역/실적 매칭 → 종합 점수 (참여 권장 강화)
-2. **참가 업체 수 예측 + 확률 표시**: 1등 가능성 직관적 시각화
-3. **낙찰하한율 정밀 계산기**: A값 자동 추출 + 공식 적용 (도메인 본질 무기)
-4. 추출 결과를 곧바로 `/bids/new`로 이어 등록 가능하게
-5. 스캔본 PDF용 OCR 폴백 (Gemini vision 또는 외부 OCR)
-6. 다중 사용자 대응 시 RLS 활성화 + auth 연동
+1. **복수예비가격 PDF + 낙찰하한율 정밀 계산기**: A값/예가 범위/추첨 가격 4종 추출 → 정확한 낙찰하한율 역산 (정확도 무기)
+2. **공고 선택 점수**: 면허/시평/지역/실적 매칭 → 종합 점수
+3. **참가 업체 수 예측 + 확률 표시**: 1등 가능성 직관적 시각화
+4. 스캔본 PDF용 OCR 폴백 (Gemini vision 또는 외부 OCR)
+5. 다중 사용자 대응 시 RLS 활성화 + auth 연동

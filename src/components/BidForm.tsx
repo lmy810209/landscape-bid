@@ -23,7 +23,7 @@ type FormState = {
   note: string;
 };
 
-const initial: FormState = {
+const EMPTY_FORM: FormState = {
   notice_no: "",
   notice_title: "",
   agency: "",
@@ -42,9 +42,13 @@ const initial: FormState = {
   note: "",
 };
 
-export default function BidForm() {
+type Props = {
+  initial?: Partial<FormState>;
+};
+
+export default function BidForm({ initial }: Props = {}) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initial);
+  const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...initial });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -270,7 +274,7 @@ export default function BidForm() {
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => setForm(initial)}
+          onClick={() => setForm(EMPTY_FORM)}
           className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50"
         >
           초기화
