@@ -8,6 +8,7 @@ import {
   formatKRW,
   formatPercent,
 } from "@/lib/analysis/calculations";
+import BidRowActions from "@/components/BidRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function BidListPage() {
                 <th className="px-3 py-2 text-right">내 투찰률</th>
                 <th className="px-3 py-2 text-right">내 차이값</th>
                 <th className="px-3 py-2 text-center">결과</th>
+                <th className="px-3 py-2 text-center">작업</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -86,6 +88,9 @@ export default async function BidListPage() {
                   </td>
                   <td className="px-3 py-2 text-center">
                     <ResultBadge status={b.result_status} />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <BidRowActions bidId={b.id} noticeTitle={b.notice_title} />
                   </td>
                 </tr>
               ))}

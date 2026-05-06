@@ -13,10 +13,15 @@
 // === 정책 상수 ===
 
 // 표본 수에 따른 위치 비율. 표본 적을수록 좁게, 많을수록 점진적으로 벌림.
+// 2026-04 재튜닝:
+//   v1(초기): scarce 0.40/0.50/0.60, moderate 0.35/0.50/0.65, rich 0.30/0.50/0.70
+//   v2(중앙집중): scarce 0.45/0.50/0.55, moderate 0.42/0.50/0.58, rich 0.40/0.50/0.60
+//     → 보수형 방어 상실(부적격 회피율 0%)로 폐기
+//   v3(현재): 공격형은 v2 근처로 유지(중앙 근처), 보수형은 v1보다 더 상향해 하한선 방어 강화.
 const POSITION_RATIOS = {
-  scarce: { aggressive: 0.4, balanced: 0.5, conservative: 0.6 }, // sample <= 4
-  moderate: { aggressive: 0.35, balanced: 0.5, conservative: 0.65 }, // 5 ~ 9
-  rich: { aggressive: 0.3, balanced: 0.5, conservative: 0.7 }, // >= 10
+  scarce: { aggressive: 0.42, balanced: 0.5, conservative: 0.68 }, // sample <= 4
+  moderate: { aggressive: 0.38, balanced: 0.5, conservative: 0.7 }, // 5 ~ 9
+  rich: { aggressive: 0.35, balanced: 0.5, conservative: 0.72 }, // >= 10
 } as const;
 
 // my_gap_rate 보정 강도: 과거 평균 차이의 30%, 단 ±0.0003 이내.
@@ -64,11 +69,11 @@ export type StrategyInput = {
 
 const DESCRIPTIONS = {
   aggressive:
-    "추천 구간 하단 쪽에 배치한 전략 옵션입니다. 더 낮은 위치를 선택해 1등 가능성을 적극적으로 노리는 참고값입니다.",
+    "참고 구간 하단 쪽에 배치한 위치 옵션입니다. 더 낮은 위치를 선택해 1등 가능성을 적극적으로 노리는 참고값입니다.",
   balanced:
-    "추천 구간의 중심값을 기준으로 한 기본 전략 옵션입니다. 과도한 치우침 없이 가장 일반적으로 검토할 수 있는 참고값입니다.",
+    "참고 구간의 중심값을 기준으로 한 기본 위치 옵션입니다. 과도한 치우침 없이 가장 일반적으로 검토할 수 있는 참고값입니다.",
   conservative:
-    "추천 구간 상단 쪽에 배치한 전략 옵션입니다. 과도한 저가를 피하고 비교적 안정적으로 접근하는 참고값입니다.",
+    "참고 구간 상단 쪽에 배치한 위치 옵션입니다. 과도한 저가를 피하고 비교적 안정적으로 접근하는 참고값입니다.",
 } as const;
 
 // === 내부 유틸 ===

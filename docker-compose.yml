@@ -1,0 +1,30 @@
+services:
+  landscape-bid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 빌드 시점에 클라이언트 번들에 박히는 NEXT_PUBLIC_* 변수
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    image: landscape-bid:latest
+    container_name: landscape-bid
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # 런타임 환경변수 (서버 전용)
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      NARA_API_KEY: ${NARA_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      NODE_ENV: production
+    volumes:
+      # 수집 데이터 영속화 (선택)
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/"]
+      interval: 1m
+      timeout: 10s
+      retries: 3

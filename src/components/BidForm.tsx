@@ -44,13 +44,16 @@ const EMPTY_FORM: FormState = {
 
 type Props = {
   initial?: Partial<FormState>;
+  mode?: "create" | "edit";
+  bidId?: string;
 };
 
-export default function BidForm({ initial }: Props = {}) {
+export default function BidForm({ initial, mode = "create", bidId }: Props = {}) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...initial });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isEdit = mode === "edit";
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -87,8 +90,11 @@ export default function BidForm({ initial }: Props = {}) {
       note: form.note.trim() || null,
     };
 
-    const res = await fetch("/api/bids", {
-      method: "POST",
+    const url = isEdit && bidId ? `/api/bids/${bidId}` : "/api/bids";
+    const method = isEdit ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
@@ -100,7 +106,11 @@ export default function BidForm({ initial }: Props = {}) {
       return;
     }
 
-    router.push("/bids");
+    if (isEdit && bidId) {
+      router.push(`/bids/${bidId}`);
+    } else {
+      router.push("/bids");
+    }
     router.refresh();
   }
 
@@ -272,19 +282,29 @@ export default function BidForm({ initial }: Props = {}) {
       )}
 
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setForm(EMPTY_FORM)}
-          className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50"
-        >
-          초기화
-        </button>
+        {isEdit ? (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50"
+          >
+            취소
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setForm(EMPTY_FORM)}
+            className="rounded border px-3 py-1.5 text-sm hover:bg-slate-50"
+          >
+            초기화
+          </button>
+        )}
         <button
           type="submit"
           disabled={submitting}
           className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
         >
-          {submitting ? "저장 중..." : "저장"}
+          {submitting ? (isEdit ? "수정 중..." : "저장 중...") : isEdit ? "수정 저장" : "저장"}
         </button>
       </div>
     </form>

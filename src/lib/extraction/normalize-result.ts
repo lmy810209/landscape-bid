@@ -91,6 +91,7 @@ export type ResultPrefill = {
   second_amount: number | null;
   result_status: ResultStatus;
   note: string | null;
+  sucsfbid_lwlt_rate?: number | null;
 };
 
 export type ResultMyMatchSummary = {

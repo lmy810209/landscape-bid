@@ -12,6 +12,30 @@ import type { Bid } from "@/types/bid";
 import { calcMyBidRatio, calcWinRatio } from "./calculations";
 import { MIN_FOR_CONDITIONAL, computeRecommendation } from "./recommendation";
 import { calculateBidStrategies, type BidStrategies } from "./strategy";
+import {
+  bootstrapCI,
+  calibrationTone,
+  mean,
+  quantiles,
+  stddev,
+  wilsonCI,
+  type BootstrapCI,
+  type CalibrationTone,
+  type WilsonCI,
+} from "./stats";
+
+// 정규분포 가정 하의 구간 폭 배율.
+// 50% 구간 = 평균 ± 0.6745σ → 폭 1.349σ
+// 80% 구간 = 평균 ± 1.2816σ → 폭 2.563σ
+const HALFWIDTH_50 = 1.349;
+const HALFWIDTH_80 = 2.563;
+
+// 이론 하한값 (concept-note.md §2.3, 균등 ±2.5% 가정 기반)
+// - SD(낙찰하한금액/기초) ≈ 0.58%
+// - 50% 구간 이론 폭 = 1.349 × 0.58% ≈ 0.78%
+// - 80% 구간 이론 폭 = 2.563 × 0.58% ≈ 1.49%
+export const SHARPNESS_LOWER_BOUND_50 = 0.0078;
+export const SHARPNESS_LOWER_BOUND_80 = 0.0149;
 
 export type StrategyLabel = "공격형" | "균형형" | "보수형";
 
@@ -21,6 +45,13 @@ export type BacktestErrorBreakdown = {
   conservative: number;
   min: number; // 세 전략 중 최소 오차
   bestLabel: StrategyLabel;
+};
+
+export type QuantileBand = {
+  low: number;
+  high: number;
+  width: number;
+  includedActual: boolean | null;
 };
 
 export type BacktestRow = {
@@ -41,6 +72,12 @@ export type BacktestRow = {
   // true이면 도구의 보수형을 따랐을 때 1등보다도 위에 있었으므로 낙찰하한선 미달을 거의 확실히 회피했을 것.
   // 부적격이 아니거나 strategies 미산출 시 null.
   underThresholdAvoidable: boolean | null;
+
+  // P1 신규: Quantile 기반 신뢰구간 (기존 expandRange 구간과 병행).
+  // 목표 커버리지 50% (Q25~Q75), 80% (Q10~Q90). 과거 win_ratio 분포에서 직접 산출.
+  // null: historicalSampleCount가 quantile 계산에 부족하거나 actualWinRatio 없음.
+  quantile50: QuantileBand | null;
+  quantile80: QuantileBand | null;
 };
 
 export type BacktestSummary = {
@@ -75,6 +112,40 @@ export type BacktestSummary = {
   underThresholdTotal: number;
   underThresholdAvoidableCount: number;
   underThresholdAvoidableRate: number | null;
+
+  // P1 신규 지표 (concept-note v2.1 §3)
+  // Calibration: 목표 커버리지 대비 실측 포함률 (Wilson CI 병기)
+  // Sharpness: 구간 평균 폭 (Bootstrap CI 병기)
+  // improvementCI: 개선률의 Wilson CI (기존 improvementRate는 점 추정만)
+  // vsUserMaeRatio: 도구 최소 오차 평균 / 사용자 오차 평균 (< 1 이어야 의미)
+  calibration50: {
+    ci: WilsonCI;
+    target: number;
+    tone: CalibrationTone;
+    n: number;
+  } | null;
+  calibration80: {
+    ci: WilsonCI;
+    target: number;
+    tone: CalibrationTone;
+    n: number;
+  } | null;
+  sharpness50: {
+    ci: BootstrapCI; // 단위: 사정율 소수 (예: 0.0078 = 0.78%p)
+    theoreticalLowerBound: number; // 추첨만 고려한 이론 하한 (σ_draw 기반)
+    empiricalLowerBound: number | null; // 실측 σ_total 기반 하한 (null = 표본 부족)
+    n: number;
+  } | null;
+  sharpness80: {
+    ci: BootstrapCI;
+    theoreticalLowerBound: number;
+    empiricalLowerBound: number | null;
+    n: number;
+  } | null;
+  // 전체 평가 대상의 win_ratio 표준편차. Sharpness 실측 하한 계산의 기준.
+  empiricalSigma: number | null;
+  improvementCI: WilsonCI | null;
+  vsUserMaeRatio: number | null;
 };
 
 export type BacktestResult = {
@@ -111,6 +182,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
       isRunnerUp,
       isUnderThreshold,
       underThresholdAvoidable: null,
+      quantile50: null,
+      quantile80: null,
     };
   }
 
@@ -124,7 +197,31 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
 
   const rec = computeRecommendation(historicalSubset);
 
-  // 추천 구간이 없거나 표본이 최소 임계 미만 → 검증 불가 (도구 한계)
+  // Quantile 기반 구간 계산 (기존 expandRange와 병행, 학습 데이터가 작은 환경에서
+  // 안정성이 더 높을 것으로 기대. concept-note §3 참조).
+  // 과거 win_ratio 집합에서 직접 quantile 추출. 계산 가능한 건만 사용.
+  const historicalWinRatios = historicalSubset
+    .map(calcWinRatio)
+    .filter((x): x is number => x != null);
+
+  // quantile 계산은 기술적으로 n>=2부터 가능하지만, 의미 있는 50/80 구간은 n>=4 권장.
+  const QUANTILE_MIN_N = 4;
+  const qBand = (p1: number, p2: number): QuantileBand | null => {
+    if (historicalWinRatios.length < QUANTILE_MIN_N) return null;
+    const [lo, hi] = quantiles(historicalWinRatios, [p1, p2]);
+    if (lo == null || hi == null) return null;
+    return {
+      low: lo,
+      high: hi,
+      width: hi - lo,
+      includedActual: actualWinRatio >= lo && actualWinRatio <= hi,
+    };
+  };
+  const quantile50 = qBand(0.25, 0.75);
+  const quantile80 = qBand(0.1, 0.9);
+
+  // 추천 구간이 없거나 표본이 최소 임계 미만 → 기존 지표 검증 불가.
+  // 단 quantile 구간은 이미 위에서 계산됨 (따로 보관).
   if (!rec.range || rec.sampleCount < MIN_FOR_CONDITIONAL) {
     return {
       bid: target,
@@ -141,6 +238,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
       isRunnerUp,
       isUnderThreshold,
       underThresholdAvoidable: null,
+      quantile50,
+      quantile80,
     };
   }
 
@@ -191,6 +290,8 @@ function evaluateOne(target: Bid, allBids: Bid[]): BacktestRow {
     isRunnerUp,
     isUnderThreshold,
     underThresholdAvoidable,
+    quantile50,
+    quantile80,
   };
 }
 
@@ -224,6 +325,13 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
       underThresholdTotal: 0,
       underThresholdAvoidableCount: 0,
       underThresholdAvoidableRate: null,
+      calibration50: null,
+      calibration80: null,
+      sharpness50: null,
+      sharpness80: null,
+      empiricalSigma: null,
+      improvementCI: null,
+      vsUserMaeRatio: null,
     };
   }
 
@@ -263,6 +371,84 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
   const underThresholdAvoidableRate =
     underThresholdTotal > 0 ? underThresholdAvoidableCount / underThresholdTotal : null;
 
+  // === P1 신규 지표 ===
+  // Calibration: Quantile 구간에 실제 사정율이 들어왔는지
+  const q50Rows = [...evaluated, ...rows.filter((r) => r.status === "insufficient_data")]
+    .filter((r) => r.quantile50 != null && r.quantile50.includedActual != null);
+  const q80Rows = [...evaluated, ...rows.filter((r) => r.status === "insufficient_data")]
+    .filter((r) => r.quantile80 != null && r.quantile80.includedActual != null);
+
+  const calibration50 =
+    q50Rows.length > 0
+      ? (() => {
+          const k = q50Rows.filter((r) => r.quantile50!.includedActual === true).length;
+          const ci = wilsonCI(k, q50Rows.length, 0.95);
+          return {
+            ci,
+            target: 0.5,
+            tone: calibrationTone(ci.point, 0.5),
+            n: q50Rows.length,
+          };
+        })()
+      : null;
+
+  const calibration80 =
+    q80Rows.length > 0
+      ? (() => {
+          const k = q80Rows.filter((r) => r.quantile80!.includedActual === true).length;
+          const ci = wilsonCI(k, q80Rows.length, 0.95);
+          return {
+            ci,
+            target: 0.8,
+            tone: calibrationTone(ci.point, 0.8),
+            n: q80Rows.length,
+          };
+        })()
+      : null;
+
+  // Sharpness: Quantile 구간의 평균 폭 (Bootstrap CI 병기)
+  const widths50 = q50Rows.map((r) => r.quantile50!.width);
+  const widths80 = q80Rows.map((r) => r.quantile80!.width);
+
+  // 실측 σ_total 계산 (평가된 모든 win_ratio의 표본 표준편차).
+  // concept-note §2.4에서 "σ_total = √(σ_draw² + σ_bias²)"로 분해.
+  // 이 값을 기반으로 Sharpness의 "실측 이론 하한"을 산출.
+  const allActualRatios = rows
+    .filter((r) => r.actualWinRatio != null)
+    .map((r) => r.actualWinRatio as number);
+  const empiricalSigma = allActualRatios.length >= 2 ? stddev(allActualRatios) : null;
+  const empLB50 = empiricalSigma != null ? HALFWIDTH_50 * empiricalSigma : null;
+  const empLB80 = empiricalSigma != null ? HALFWIDTH_80 * empiricalSigma : null;
+
+  const sharpness50 =
+    widths50.length > 0
+      ? {
+          ci: bootstrapCI(widths50, mean, { iters: 1000, level: 0.95 }),
+          theoreticalLowerBound: SHARPNESS_LOWER_BOUND_50,
+          empiricalLowerBound: empLB50,
+          n: widths50.length,
+        }
+      : null;
+
+  const sharpness80 =
+    widths80.length > 0
+      ? {
+          ci: bootstrapCI(widths80, mean, { iters: 1000, level: 0.95 }),
+          theoreticalLowerBound: SHARPNESS_LOWER_BOUND_80,
+          empiricalLowerBound: empLB80,
+          n: widths80.length,
+        }
+      : null;
+
+  // 개선률 Wilson CI (기존 improvementRate는 점 추정)
+  const improvementCI =
+    withMyError.length > 0 ? wilsonCI(improvedCount, withMyError.length, 0.95) : null;
+
+  // 도구 MAE / 사용자 MAE — 1 미만이어야 의미 있음
+  const meanBest = meanError.bestOfThree ?? 0;
+  const vsUserMaeRatio =
+    meanMyError != null && meanMyError > 0 ? meanBest / meanMyError : null;
+
   return {
     totalBids,
     evaluatedCount,
@@ -280,10 +466,12 @@ function aggregateSummary(rows: BacktestRow[]): BacktestSummary {
     underThresholdTotal,
     underThresholdAvoidableCount,
     underThresholdAvoidableRate,
+    calibration50,
+    calibration80,
+    sharpness50,
+    sharpness80,
+    empiricalSigma,
+    improvementCI,
+    vsUserMaeRatio,
   };
-}
-
-function mean(xs: number[]): number {
-  if (xs.length === 0) return 0;
-  return xs.reduce((a, b) => a + b, 0) / xs.length;
 }

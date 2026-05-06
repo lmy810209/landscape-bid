@@ -10,6 +10,7 @@ import {
   formatKRW,
   formatPercent,
 } from "@/lib/analysis/calculations";
+import BidRowActions from "@/components/BidRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,11 @@ export default async function BidDetailPage({ params }: { params: { id: string }
           >
             이 공고로 분석하기
           </Link>
+          <BidRowActions
+            bidId={bid.id}
+            noticeTitle={bid.notice_title}
+            redirectTo="/bids"
+          />
           <Link href="/bids" className="text-sm text-blue-600 hover:underline">
             ← 목록으로
           </Link>
