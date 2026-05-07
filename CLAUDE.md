@@ -675,15 +675,19 @@ UI: `src/components/BidLookup.tsx` — 공고번호 input + 조회 버튼. PDF �
 
 # 데이터 현황 (2026-05-04 갱신)
 
-5년치 안산 풀 스캔 완료 (3년치 → 5년치 확장):
+5년치 안산 풀 스캔 완료 (3년치 → 5년치 확장, 2026-05-07 추가):
 
 | 테이블 | 이전 (3년) | 현재 (5년) |
 |---|---:|---:|
 | `public_wins` (전체) | ~280 | **871** |
 | `public_wins` (안산∩비방제) | 199 | **652** |
 | `public_preprices` | 2,910 | **9,690** |
+| `public_participants` (op13) | 5,303 | **18,497** |
 | 안산∩비방제 고유 낙찰자 | 26 | **61** |
 | 연평균 안산∩비방제 공고 | 66 | **108.7** |
+| `bids` (본인) | 19 | **85** (op13 자동 sync) |
+| `data/notice-methods.json` | — | **652 공고 메타** (sucsfbidMthdNm) |
+| `companies` | — | **1,441** |
 
 **상위 5개 (안산∩비방제 5년 누적)**:
 | 순위 | 업체 (bizno) | 누적 | 평균 사정율 | 패턴 |
@@ -804,24 +808,38 @@ UI: `src/components/BidLookup.tsx` — 공고번호 input + 조회 버튼. PDF �
 }
 ```
 
-## 통합 흐름 (`/bids/new`)
+## 통합 흐름 (`/bids/new`, 2026-05-07 갱신)
 
 ```
 BidEntryWithUpload
-  ├─ QualificationCheck (자격 PDF 업로드 + Gemini 매칭)
+  ├─ QualificationCheck (수동 PDF 업로드 + Gemini 매칭)
   ├─ BidLookup (공고번호 → 4 API 병렬)
   ├─ ResultPdfUploader (개찰결과 PDF)
+  ├─ AutoQualificationCheck ← 신규. lookup 후 자동 PDF 다운 + Gemini 자격 분석
   ├─ MarketAnalysisPanel ← lookup 성공 시 자동 호출
   │   ├─ FinalJudgmentBox
   │   ├─ MarketTypeCard
-  │   ├─ AggressiveScenariosCard
+  │   ├─ AggressiveScenariosCard ← 일반/감액 라벨 표시
   │   └─ TopCompetitorsCard
   ├─ AnalyzePanel (기존 v2.2 — 사정율 분포 시각화)
   └─ BidForm (등록)
 ```
 
-`BidLookup.onLookup` 콜백이 `ResultPrefill`에 `sucsfbid_lwlt_rate` 필드를 추가해 전달.
-`BidEntryWithUpload`가 이를 `NoticeContext`로 변환해 `MarketAnalysisPanel`에 주입.
+## 시장 분석 라이브러리 추가 모듈 (2026-05-07)
+
+- `noticeMethods.ts` — `data/notice-methods.json` 로더 + `isInsuranceNotice(noticeNo)`
+- `effectiveCutoff.ts` — op13 정상 참여자 분포로 per-notice cutoff 추정 + `isSurvivableAggressive`
+
+## /safe-zone 페이지 — 추가 섹션 (2026-05-07)
+
+기존 cross-tab + 신규:
+- 본인 진입 영역 분포 (보험료 감액 vs 일반)
+- 발주처별 일반/감액 비율 테이블
+
+## AggressiveScenariosCard — 일반/감액 명시 라벨
+
+- 보험료 감액 공고: 앰버 카드 "90%대 권장. 88%대 미달 위험 매우 높음"
+- 일반 공고: 에메랄드 카드 "88%대 시도 영역. 상위 업체 학습 공격형"
 
 ---
 
@@ -961,6 +979,69 @@ bdgtAmt, presmptPrce, sucsfbidLwltRate, sucsfbidMthdNm, mainCnsttyNm, prtcptLmtR
 1. "데이터로 못 한다"고 단정하기 전에 **반드시 코드/스키마 확인**.
 2. 오해의 소지 있으면 **분석 스크립트로 즉시 검증**.
 3. CLAUDE.md 한계 섹션은 **데이터 검증 결과만** 적기.
+
+---
+
+# 5년치 분석 핵심 발견 (2026-05-07)
+
+`scripts/analyze-*.mjs` 5개 실행 결과 종합:
+
+## 1. 보험료 감액 공고 비중 — 33.6%
+
+- 안산∩비방제 652건 중 **219건이 보험료 감액 적용** (33.6%)
+- 일반 공고 effective cutoff (정상 진입 최저 사정율 중앙): **87.88%**
+- 보험료 감액 cutoff: **90.20%**
+- 차이 **+2.32%p** — 룰 영향 큼
+- 출처: `analyze-insurance-pattern.mjs`
+
+## 2. 상위 업체 운영 모델 = 룰 따라 사정율 조정
+
+- 상위 5개 모두 보험료 감액 공고에서 사정율 **+1.5~1.9%p** 올려서 들어감
+- 회피 X. 룰 알고 적응함
+- 데이터로 명확히 보임 (5년 시행착오 결과)
+
+## 3. 새빛 진입 패턴 (충격적)
+
+| 영역 | 본인 정상 진입 |
+|---|---|
+| 보험료 감액 219건 | **25건 진입 (11%)** — 사정율 90.21% |
+| 일반 433건 | **1건 진입 (0.2%)** — 사정율 90.80% |
+
+새빛은 **일반 공고 영역(88%대) 거의 미진입**. 미개척 영역.
+
+## 4. 직접 매칭 — 새빛 vs 에스디건설 14/15 패배
+
+같은 공고에 둘 다 정상 진입한 케이스:
+- 에스디건설 vs 새빛: **에스디 14승 1패** (본인이 14번 더 높게 갔음)
+- 본인 평균 90.75% vs 에스디 89.80%
+- 손실 사례 TOP 10 모두 보험료 감액 공고에서 차이 1.2~1.7%p
+
+## 5. 발주처 × 보험료 감액 비율
+
+| 발주처 | 일반 비율 | 새빛 일반 진입 |
+|---|---:|---:|
+| 교육지원청 | **89%** | 0건 |
+| 도시공사 | 80% | 0건 |
+| 상록구 | 68% | 0건 |
+| 안산시 본청 | 63% | 1건 |
+| 단원구 | 62% | 0건 |
+
+→ 일반 공고 423건 중 새빛 진입 1건. 가장 큰 미개척.
+
+## 6. 추첨번호 패턴 — 업체 간 차이 작음
+
+상위 10개 모두 7~11% 균등 분포. **명확한 "정답" 번호 없음**.
+
+## 분석 스크립트 (전부 콘솔 출력)
+
+| 스크립트 | 분석 |
+|---|---|
+| `analyze-top-competitor-patterns.mjs` | 발주처 집중도 + 사정율 IQR |
+| `analyze-competitor-entry-patterns.mjs` | 정상 진입률 / 낙찰률 |
+| `analyze-deeper-patterns.mjs` | 추첨번호 + 동시 출현 |
+| `analyze-insurance-pattern.mjs` | 보험료 감액 vs 일반 |
+| `analyze-head-to-head.mjs` | 본인 vs 상위 직접 매칭 + 발주처×보험료 |
+| `analyze-rebids.mjs` | 재입찰 식별 (의미 작음) |
 
 ---
 
