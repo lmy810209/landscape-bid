@@ -118,6 +118,7 @@ export default function AutoQualificationCheck({ noticeNo, autoFetch = false }: 
           </div>
 
           <div className="rounded border bg-white p-2 text-xs">
+            <div className="mb-1 text-[11px] font-semibold text-slate-700">📋 자격</div>
             <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
               <Row k="요구 면허" v={data.required_licenses?.join(", ") ?? null} />
               <Row k="지역 제한" v={data.region_limit} />
@@ -131,6 +132,48 @@ export default function AutoQualificationCheck({ noticeNo, autoFetch = false }: 
               </div>
             )}
           </div>
+
+          {/* 가격 룰 — 순공사비 / 부적격 추가 룰 */}
+          {(data.pure_construction_cost ||
+            data.lower_bound_rule_text ||
+            data.applies_purcost_floor) && (
+            <div className="rounded border-2 border-orange-200 bg-orange-50/40 p-2 text-xs">
+              <div className="mb-1 text-[11px] font-semibold text-orange-900">
+                💰 가격 룰 (부적격 추가 사유 체크)
+              </div>
+              <div className="grid grid-cols-1 gap-x-4 gap-y-0.5 sm:grid-cols-2">
+                <Row
+                  k="순공사비"
+                  v={data.pure_construction_cost ? `${data.pure_construction_cost.toLocaleString()}원` : null}
+                />
+                <Row
+                  k="기초금액 (PDF)"
+                  v={data.base_amount_in_doc ? `${data.base_amount_in_doc.toLocaleString()}원` : null}
+                />
+              </div>
+              {data.lower_bound_rule_text && (
+                <div className="mt-1 rounded bg-white/60 p-1.5 text-[11px] text-slate-800">
+                  <strong>룰 원문:</strong> {data.lower_bound_rule_text}
+                </div>
+              )}
+              {data.applies_purcost_floor === true && data.purcost_floor_pct && (
+                <div className="mt-1 rounded bg-red-100 p-1.5 text-[11px] font-semibold text-red-900">
+                  ⚠ 순공사비 {data.purcost_floor_pct}% 미만 부적격 룰 적용 — 사정율 안전권이라도 별도 체크 필수
+                  {data.pure_construction_cost && (
+                    <div className="mt-0.5 font-normal">
+                      → 최소 투찰가:{" "}
+                      <strong>
+                        {Math.round(
+                          (data.pure_construction_cost * data.purcost_floor_pct) / 100,
+                        ).toLocaleString()}
+                        원
+                      </strong>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-2 sm:grid-cols-3">
             {result.reasons.fail.length > 0 && <ReasonBox title="✗ 미충족" items={result.reasons.fail} tone="red" />}

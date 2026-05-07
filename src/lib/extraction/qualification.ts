@@ -19,6 +19,12 @@ export const QualificationSchema = z.object({
   joint_venture_required: z.boolean().nullable(),
   other_requirements: z.array(z.string()).nullable(),
   raw_summary: z.string().nullable(),
+  // 가격 룰 (2026-05-07 추가) — 순공사비 80% 같은 부적격 추가 룰
+  pure_construction_cost: z.number().nullable(), // 순공사비 (원)
+  base_amount_in_doc: z.number().nullable(), // 문서에 명시된 기초금액 (참고)
+  lower_bound_rule_text: z.string().nullable(), // 낙찰하한 룰 원문 (자유 텍스트)
+  applies_purcost_floor: z.boolean().nullable(), // "순공사비 80% 미만 부적격" 룰 적용 여부
+  purcost_floor_pct: z.number().nullable(), // 적용 시 % (예: 80)
 });
 
 export type QualificationDetails = z.infer<typeof QualificationSchema>;
@@ -42,6 +48,11 @@ const RESPONSE_SCHEMA = {
       nullable: true,
     },
     raw_summary: { type: Type.STRING, nullable: true },
+    pure_construction_cost: { type: Type.NUMBER, nullable: true },
+    base_amount_in_doc: { type: Type.NUMBER, nullable: true },
+    lower_bound_rule_text: { type: Type.STRING, nullable: true },
+    applies_purcost_floor: { type: Type.BOOLEAN, nullable: true },
+    purcost_floor_pct: { type: Type.NUMBER, nullable: true },
   },
   required: [
     "required_licenses",
@@ -52,6 +63,11 @@ const RESPONSE_SCHEMA = {
     "joint_venture_required",
     "other_requirements",
     "raw_summary",
+    "pure_construction_cost",
+    "base_amount_in_doc",
+    "lower_bound_rule_text",
+    "applies_purcost_floor",
+    "purcost_floor_pct",
   ],
 };
 
@@ -78,6 +94,13 @@ const SYSTEM_PROMPT = `당신은 한국 조달청/공공기관 입찰 공고에�
 - other_requirements: 위에 안 들어가는 기타 요건 한 줄씩 배열. (예: "방제업 등록", "장비 보유 증빙")
     없으면 null.
 - raw_summary: 자격요건 섹션 원문에서 가장 핵심적인 내용 1~2문장 그대로 인용.
+
+[가격 룰 — 추가 부적격 사유 식별]
+- pure_construction_cost: 순공사비 (원, 정수). "순공사비", "직접공사비", "표준공사비" 같은 표현 옆 금액. 명시 없으면 null.
+- base_amount_in_doc: 공고서에 명시된 기초금액 (원). API 데이터와 별도 검증용. 없으면 null.
+- lower_bound_rule_text: 낙찰하한 또는 부적격 판정 룰 원문 그대로. 예: "낙찰하한율 87.745% 적용" / "순공사비의 80% 이상" / "국민연금보험료 등 합산액 감액 후 평가". 없으면 null.
+- applies_purcost_floor: 본문에 "순공사비 X% 미만 부적격" 규정 명시되어 있으면 true. 단순히 순공사비 표시만 있으면 false. 명시 없으면 null.
+- purcost_floor_pct: applies_purcost_floor=true일 때 그 % 값. (예: 80)
 
 [금지]
 - 본문에 없는 항목 추측 금지.

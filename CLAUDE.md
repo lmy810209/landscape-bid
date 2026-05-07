@@ -1114,6 +1114,25 @@ op13 정상 참여 + public_wins로 본인 `bids` 테이블 자동 채움.
 - TODO: data.go.kr 문서에서 operation 정확한 이름 찾기
 - 가치 ⭐ 낮음 (낙찰 후 포기 케이스 식별 정도)
 
+## PDF 가격 룰 추출 확장 (2026-05-07 추가)
+API endpoint 못 찾은 #2 (순공사비 80% 룰)을 PDF 추출로 우회.
+
+`qualification.ts` 확장 필드:
+- `pure_construction_cost`: 순공사비 (PDF 명시 시)
+- `base_amount_in_doc`: PDF 기초금액 (검증용)
+- `lower_bound_rule_text`: 낙찰하한 룰 원문 (자유 텍스트)
+- `applies_purcost_floor`: 순공사비 80% 미만 부적격 룰 적용 여부
+- `purcost_floor_pct`: 적용 % (예: 80)
+
+UI: AutoQualificationCheck에 "💰 가격 룰" 별도 섹션 (오렌지 톤). 순공사비 80% 룰 적용 시 빨강 경고 + 최소 투찰가 자동 계산.
+
+검증: R26BK01294519에서 보험료 감액 룰 원문 정확히 추출됨.
+
+## 사전규격 서비스 (15129404) — 미사용
+- 403 권한 거부 → 활용신청 안 됨
+- 사용자가 data.go.kr에서 추가 활용신청 필요 (1~3일)
+- 가치: 정식 공고 1~2주 전 인지 → 시도율 ↑
+
 ---
 
 # 추가 분석 가능 목록 (미수행, 2026-05-07)
