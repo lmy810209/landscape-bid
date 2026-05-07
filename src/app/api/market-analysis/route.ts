@@ -5,6 +5,7 @@ import { analyzeTopCompetitors, type TopCompetitorsAnalysis } from "@/lib/market
 import { buildAggressiveScenarios, type AggressiveScenariosResult } from "@/lib/marketAnalysis/aggressiveScenarios";
 import { judge, type FinalJudgment } from "@/lib/marketAnalysis/finalJudgment";
 import type { NoticeContext, PublicWin } from "@/lib/marketAnalysis/types";
+import type { ParticipantRow } from "@/lib/marketAnalysis/effectiveCutoff";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,6 @@ export async function POST(req: Request) {
 
   const supabase = createClient();
   // 안산∩비방제 풀 전체 + 상위 5명 비안산 데이터까지 (전체 ratio 계산용)
-  // 페이지네이션
   const allWins: PublicWin[] = [];
   let from = 0;
   const PAGE = 1000;
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from("public_wins")
       .select(
-        "bidwinnr_bizno,bidwinnr_nm,bid_ntce_nm,dminstt_nm,sucsfbid_amt,sucsfbid_rate,rl_openg_dt,is_ansan,is_bangje",
+        "bid_ntce_no,bidwinnr_bizno,bidwinnr_nm,bid_ntce_nm,dminstt_nm,sucsfbid_amt,sucsfbid_rate,rl_openg_dt,is_ansan,is_bangje",
       )
       .order("rl_openg_dt", { ascending: false })
       .range(from, from + PAGE - 1);
@@ -67,9 +67,39 @@ export async function POST(req: Request) {
     from += PAGE;
   }
 
-  const market_type = classifyMarketType(ctx.agency, ctx.notice_title, allWins);
+  // op13 정상 참여자 — 안산∩비방제 공고 ID로 한정 fetch
+  const ansanNoticeIds = allWins
+    .filter((w) => w.is_ansan && !w.is_bangje && (w as { bid_ntce_no?: string }).bid_ntce_no)
+    .map((w) => (w as unknown as { bid_ntce_no: string }).bid_ntce_no);
+
+  const allParticipants: ParticipantRow[] = [];
+  // chunked fetch (URL 길이 제약 고려, 100씩)
+  for (let i = 0; i < ansanNoticeIds.length; i += 100) {
+    const chunk = ansanNoticeIds.slice(i, i + 100);
+    let pageFrom = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("public_participants")
+        .select("bid_ntce_no,prcbdr_bizno,bidprcrt,rmrk")
+        .in("bid_ntce_no", chunk)
+        .range(pageFrom, pageFrom + PAGE - 1);
+      if (error) break;
+      if (!data || data.length === 0) break;
+      allParticipants.push(...(data as ParticipantRow[]));
+      if (data.length < PAGE) break;
+      pageFrom += PAGE;
+    }
+  }
+
+  const aggressive = buildAggressiveScenarios(ctx, allWins, allParticipants);
+  const market_type = classifyMarketType(
+    ctx.agency,
+    ctx.notice_title,
+    allWins,
+    allParticipants,
+    aggressive.insurance_deduction,
+  );
   const top_competitors = analyzeTopCompetitors(allWins);
-  const aggressive = buildAggressiveScenarios(ctx, allWins);
   const final_judgment = judge(market_type, aggressive);
 
   return NextResponse.json({

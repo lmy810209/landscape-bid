@@ -13,6 +13,12 @@ import {
   type MarketType,
   extractKeywords,
 } from "./types";
+import {
+  estimateEffectiveCutoff,
+  isSurvivableAggressive,
+  type ParticipantRow,
+  type CutoffEstimate,
+} from "./effectiveCutoff";
 
 export type StrongCompany = {
   name: string;
@@ -29,6 +35,7 @@ export type MarketTypeResult = {
     keyword_median: number | null;
     recent5_rates: number[];
     strong_companies: StrongCompany[];
+    cutoff?: CutoffEstimate; // 공격형 안전권 판정 + UI 표시용
   };
   recommendation: string;
 };
@@ -44,6 +51,8 @@ export function classifyMarketType(
   noticeAgency: string,
   noticeName: string,
   allWins: PublicWin[],
+  participants: ParticipantRow[] = [],
+  insuranceDeduction = false,
 ): MarketTypeResult {
   // 안산∩비방제만
   const ansanPool = allWins.filter((w) => w.is_ansan && !w.is_bangje && w.sucsfbid_rate != null);
@@ -106,33 +115,36 @@ export function classifyMarketType(
     }
   }
 
+  // op13 cutoff 추정 — 매칭 공고들의 정상 진입자 분포
+  const matchedNoticeIds = matched.map((w) => w.bid_ntce_no).filter((x): x is string => !!x);
+  const cutoff = estimateEffectiveCutoff(matchedNoticeIds, participants);
+
+  function buildReasons() {
+    return {
+      sample_size: matched.length,
+      agency_median: agencyMedian,
+      keyword_median: keywordMedian,
+      recent5_rates: recent5,
+      strong_companies: strongCompanies,
+      cutoff,
+    };
+  }
+
   // ─── 우선순위 적용 ───
   // 1. 데이터 부족
   if (matched.length < MARKET_TYPE_THRESHOLDS.MIN_SAMPLE_SIZE) {
     return {
       type: "데이터 부족",
-      reasons: {
-        sample_size: matched.length,
-        agency_median: agencyMedian,
-        keyword_median: keywordMedian,
-        recent5_rates: recent5,
-        strong_companies: strongCompanies,
-      },
+      reasons: buildReasons(),
       recommendation: "기존 안전형 기준으로만 참고",
     };
   }
 
-  // 2. 강자 회피
+  // 2. 강자 회피 (op13 분포로도 공격형 안전권이면 강자 영역과 별개로 시도 가치)
   if (strongCompanies.length > 0) {
     return {
       type: "강자 회피",
-      reasons: {
-        sample_size: matched.length,
-        agency_median: agencyMedian,
-        keyword_median: keywordMedian,
-        recent5_rates: recent5,
-        strong_companies: strongCompanies,
-      },
+      reasons: buildReasons(),
       recommendation: "참여 시 공격형 아니면 실익 낮음",
     };
   }
@@ -141,52 +153,43 @@ export function classifyMarketType(
   const recentSafe = recent5.filter((r) => r >= MARKET_TYPE_THRESHOLDS.RECENT_SAFE_THRESHOLD).length;
   const recentAgg = recent5.filter((r) => r <= MARKET_TYPE_THRESHOLDS.RECENT_AGGRESSIVE_THRESHOLD).length;
 
-  // 3. 안전형 필요 (최근 트렌드 우선)
+  // 3. 공격형 안전권 (op13 cutoff 분포가 충분히 낮음 — 88%대 시도해도 정상 진입 가능)
+  // 단, 보험료 감액 공고는 effective cutoff가 advertised보다 위로 형성되므로 "안전권" 판정 X.
+  if (!insuranceDeduction && isSurvivableAggressive(cutoff)) {
+    return {
+      type: "공격형 안전권",
+      reasons: buildReasons(),
+      recommendation: "88%대 시도 가능. op13 정상 진입자 절반 이상이 88.5% 이하 cutoff",
+    };
+  }
+
+  // 4. 안전형 필요 (최근 트렌드 우선)
   if (
     (matchedMedian != null && matchedMedian >= MARKET_TYPE_THRESHOLDS.SAFE_MIN_MEDIAN) ||
     recentSafe >= MARKET_TYPE_THRESHOLDS.RECENT_SAFE_COUNT
   ) {
     return {
       type: "안전형 필요",
-      reasons: {
-        sample_size: matched.length,
-        agency_median: agencyMedian,
-        keyword_median: keywordMedian,
-        recent5_rates: recent5,
-        strong_companies: strongCompanies,
-      },
+      reasons: buildReasons(),
       recommendation: "낙찰보다 미달 회피 우선",
     };
   }
 
-  // 4. 공격형 가능
+  // 5. 공격형 가능 (낙찰자 분포 기반)
   if (
     (matchedMedian != null && matchedMedian <= MARKET_TYPE_THRESHOLDS.AGGRESSIVE_MAX_MEDIAN) ||
     recentAgg >= MARKET_TYPE_THRESHOLDS.RECENT_AGGRESSIVE_COUNT
   ) {
     return {
       type: "공격형 가능",
-      reasons: {
-        sample_size: matched.length,
-        agency_median: agencyMedian,
-        keyword_median: keywordMedian,
-        recent5_rates: recent5,
-        strong_companies: strongCompanies,
-      },
+      reasons: buildReasons(),
       recommendation: "공격형 검토 가능. 단, 미달 위험 표시",
     };
   }
 
-  // 모호 영역 → 데이터 부족 처리
   return {
     type: "데이터 부족",
-    reasons: {
-      sample_size: matched.length,
-      agency_median: agencyMedian,
-      keyword_median: keywordMedian,
-      recent5_rates: recent5,
-      strong_companies: strongCompanies,
-    },
+    reasons: buildReasons(),
     recommendation: "기존 안전형 기준으로만 참고",
   };
 }

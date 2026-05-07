@@ -62,7 +62,19 @@ export function judge(
     };
   }
 
-  // 5순위: 공격형 가능
+  // 5순위: 공격형 안전권 (op13 cutoff 기반 — 시도 참고 신호)
+  if (marketType.type === "공격형 안전권") {
+    const c = marketType.reasons.cutoff;
+    const missRisk = c?.miss_risk_at_88_5 ?? 0.5;
+    return {
+      go_status: "GO",
+      strategy: "공격형",
+      reason: `참고 시나리오 — 유사 공고 ${c?.matched_notices ?? 0}건 중 정상 진입 cutoff 중앙값 ${(c?.per_notice_median ?? 0).toFixed(2)}%. 88.5% 시도 시 미달 위험 추정 ${(missRisk * 100).toFixed(0)}%.`,
+      caution: "낙찰 가능 X / 시도 참고 O. 공고별 차이 있어 미달 위험은 항상 동반.",
+    };
+  }
+
+  // 6순위: 공격형 가능
   if (marketType.type === "공격형 가능") {
     const aggressiveLowRisk =
       aggressive.scenarios.filter((s) => s.risk_level === "낮음").length >= 2;
@@ -74,7 +86,6 @@ export function judge(
     };
   }
 
-  // 기본
   return {
     go_status: "조건부 GO",
     strategy: "안전형",

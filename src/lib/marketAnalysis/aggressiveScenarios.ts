@@ -11,6 +11,7 @@ import {
   type PublicWin,
 } from "./types";
 import { TOP5_COMPETITORS } from "./topCompetitors";
+import { estimateEffectiveCutoff, type ParticipantRow } from "./effectiveCutoff";
 
 export type RiskLevel = "낮음" | "중간" | "높음";
 export type Position = "공격권" | "정상권" | "미달위험권";
@@ -68,6 +69,7 @@ function classifyPosition(rate: number, similarMedian: number | null): Position 
 export function buildAggressiveScenarios(
   ctx: NoticeContext,
   allWins: PublicWin[],
+  participants: ParticipantRow[] = [],
 ): AggressiveScenariosResult {
   const ansanPool = allWins.filter((w) => w.is_ansan && !w.is_bangje && w.sucsfbid_rate != null);
   const noticeKeywords = extractKeywords(ctx.notice_title);
@@ -103,30 +105,41 @@ export function buildAggressiveScenarios(
   const top5Avg =
     top5Rates.length > 0 ? top5Rates.reduce((s, r) => s + r, 0) / top5Rates.length : null;
 
-  // 보험료 감액 감지 + effective cutoff 추정
+  // op13 정상 참여자 데이터로 effective cutoff 추정 (보험료 감액 + 일반 모두)
+  const matchedNoticeIds = matched.map((w) => w.bid_ntce_no).filter((x): x is string => !!x);
+  const cutoffStats = estimateEffectiveCutoff(matchedNoticeIds, participants);
+
   const insuranceDeduction = detectInsuranceDeduction(ctx.bid_method);
   let effectiveCutoffRate: number | null = null;
   let effectiveCutoffAmount: number | null = null;
   let warning: string | null = null;
 
+  // op13 데이터 충분하면 그걸 우선 사용 (per-notice cutoff 분포의 25%값)
+  if (cutoffStats.per_notice_p25 != null && cutoffStats.per_notice_cutoffs.length >= 5) {
+    effectiveCutoffRate = cutoffStats.per_notice_p25;
+    effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
+  }
+
   if (insuranceDeduction) {
     warning =
       "이 공고는 보험료 등 합산액 감액 적용 공고입니다. 단순 낙찰하한율보다 실제 미달선이 높게 형성될 수 있습니다.";
-
-    // 보험료 감액 공고에서는 advertised 낙찰하한율(89.745%)보다 effective cutoff가 더 높음.
-    // 가장 가까운 효과적 추정 = 최근 유사 공고 winners 중 가장 낮은 사정율 - 안전 버퍼.
-    // (winners 모두 정상 통과 → 그들 중 minimum이 cutoff 바로 위)
-    const recent = [...matched]
-      .sort((a, b) => (b.rl_openg_dt ?? "").localeCompare(a.rl_openg_dt ?? ""))
-      .slice(0, 8) // 최근 8건
-      .map((w) => Number(w.sucsfbid_rate))
-      .filter((r) => !isNaN(r));
-    if (recent.length >= 3) {
-      const minRecent = Math.min(...recent);
-      // advertised보다 위면 보험료 룰 영향 큰 것; 그게 effective cutoff.
-      // advertised보다 아래면 오히려 advertised를 cutoff로 사용 (보험료 영향 없는 케이스).
-      effectiveCutoffRate = Math.max(minRecent - 0.05, ctx.sucsfbid_lwlt_rate);
+    // 보험료 감액일 때 추정값을 실제 advertised보다 아래로 내리지 않음
+    if (effectiveCutoffRate != null && effectiveCutoffRate < ctx.sucsfbid_lwlt_rate) {
+      effectiveCutoffRate = ctx.sucsfbid_lwlt_rate;
       effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
+    }
+    // op13 데이터 없으면 fallback: 매칭 winners 최근 8건 min - 0.05
+    if (effectiveCutoffRate == null) {
+      const recent = [...matched]
+        .sort((a, b) => (b.rl_openg_dt ?? "").localeCompare(a.rl_openg_dt ?? ""))
+        .slice(0, 8)
+        .map((w) => Number(w.sucsfbid_rate))
+        .filter((r) => !isNaN(r));
+      if (recent.length >= 3) {
+        const minRecent = Math.min(...recent);
+        effectiveCutoffRate = Math.max(minRecent - 0.05, ctx.sucsfbid_lwlt_rate);
+        effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
+      }
     }
   }
 

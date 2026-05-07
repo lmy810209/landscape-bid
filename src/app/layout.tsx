@@ -34,6 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/alerts" className="text-sm text-slate-600 hover:text-slate-900">
               새 공고
             </Link>
+            <Link href="/safe-zone" className="text-sm text-violet-700 hover:text-violet-900">
+              안전권 지도
+            </Link>
           </nav>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>

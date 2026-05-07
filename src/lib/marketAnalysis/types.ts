@@ -1,6 +1,7 @@
 // 시장 분석 공통 타입.
 
 export type PublicWin = {
+  bid_ntce_no?: string | null;
   bidwinnr_bizno: string | null;
   bidwinnr_nm: string | null;
   bid_ntce_nm: string | null;
@@ -21,7 +22,12 @@ export type NoticeContext = {
   bid_method: string | null;
 };
 
-export type MarketType = "공격형 가능" | "안전형 필요" | "강자 회피" | "데이터 부족";
+export type MarketType =
+  | "공격형 안전권" // 새빛이 88%대 시도해도 미달 risk 낮은 영역 (op13 cutoff 분포 기반)
+  | "공격형 가능"
+  | "안전형 필요"
+  | "강자 회피"
+  | "데이터 부족";
 export type Strategy = "안전형" | "혼합형" | "공격형" | "회피";
 export type GoStatus = "GO" | "조건부 GO" | "NO-GO";
 
