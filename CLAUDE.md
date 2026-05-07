@@ -1042,6 +1042,50 @@ bdgtAmt, presmptPrce, sucsfbidLwltRate, sucsfbidMthdNm, mainCnsttyNm, prtcptLmtR
 | `analyze-insurance-pattern.mjs` | 보험료 감액 vs 일반 |
 | `analyze-head-to-head.mjs` | 본인 vs 상위 직접 매칭 + 발주처×보험료 |
 | `analyze-rebids.mjs` | 재입찰 식별 (의미 작음) |
+| `analyze-attempt-rate.mjs` | 시도율 추정 |
+| `analyze-bid-methods.mjs` | bid_method 세분화 분포 |
+| `analyze-timeline-trend.mjs` | ★ 5년 시계열 트렌드 (시장 변화) |
+| `analyze-drwt-rate-combo.mjs` | 추첨번호 + 사정율 결합 |
+
+## 7. ⚡ 시장 시계열 변화 (최대 발견)
+
+`analyze-timeline-trend.mjs` 결과:
+
+| 연도 | 88%대 | 89.5~90.5% | 90%대 |
+|---|---:|---:|---:|
+| 2021 | **100%** | 0% | 0% |
+| 2022~2024 | 100% | 0% | 0% |
+| 2025 | 54% | 36% | 10% |
+| **2026** | **0%** | **70%** | **30%** |
+
+**시장 자체가 88% → 90%대로 명확히 이동**. 4월 30일 도구가 빗나간 진짜 원인.
+5년 누적 평균(88.65%)은 옛날 데이터에 끌려 현재 트렌드 못 잡음.
+
+### 알고리즘 반영 후보 (미수행)
+
+- `recommendation.ts`: `RECENT_COUNT 3 → 8`, `RECENT_WEIGHT 2.0 → 5.0`
+- 또는 시기별 분리 (최근 12개월만 사용)
+- 또는 /safe-zone에 시계열 카드
+
+→ 미반영. 사용자 1개월 실험으로 검증 후 결정.
+
+## 8. 시공능력평가 정보 (#1, 미수집)
+
+조달청 BidPublicInfoService에는 시평액 필드 없음 (확인됨).
+별도 API (KISCON 등) 필요 — 활용신청 안 됨.
+
+대안: 본인 시평액 1회 수동 입력 → `myCompany.ts`의 `cnstrtnAbltyEvlAmt`.
+매년 1회 갱신.
+
+## 9. bid_method 분포
+
+```
+공고서참조       65.3%  평균 88.02%
+소액수의견적+감액  33.6%  평균 89.69%
+수의시담          0.9%  평균 94.84%
+```
+
+대부분 적격심사(공고서참조). 보험료 감액 외 별다른 패턴 X.
 
 ---
 
