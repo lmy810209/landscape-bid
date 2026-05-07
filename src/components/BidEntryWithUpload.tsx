@@ -9,6 +9,7 @@ import BidLookup from "./BidLookup";
 import ResultPdfUploader from "./ResultPdfUploader";
 import AnalyzePanel from "./AnalyzePanel";
 import QualificationCheck from "./QualificationCheck";
+import AutoQualificationCheck from "./AutoQualificationCheck";
 import MarketAnalysisPanel from "./MarketAnalysisPanel";
 import type { NoticeContext } from "@/lib/marketAnalysis/types";
 
@@ -113,6 +114,8 @@ export default function BidEntryWithUpload({ bids, agencyOptions, workTypeOption
       <QualificationCheck />
       <BidLookup onLookup={applyExtracted} />
       <ResultPdfUploader onExtracted={applyExtracted} />
+
+      {marketCtx?.notice_no && <AutoQualificationCheck noticeNo={marketCtx.notice_no} />}
 
       {marketCtx && <MarketAnalysisPanel ctx={marketCtx} />}
 

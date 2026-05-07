@@ -964,6 +964,33 @@ bdgtAmt, presmptPrce, sucsfbidLwltRate, sucsfbidMthdNm, mainCnsttyNm, prtcptLmtR
 
 ---
 
+# API 자동화 — 2026-05-07 추가 작업
+
+## 본인 입찰 자동 sync (`scripts/sync-my-bids.mjs`)
+op13 정상 참여 + public_wins로 본인 `bids` 테이블 자동 채움.
+- 19건 (수동) → 85건 (자동 +66) 적재
+- 미달 부적격 4건은 op13에 없음 — 수동 입력 필요
+
+## 공고문 자동 다운로드 + Gemini 자격 추출
+- API: `POST /api/auto-qualification` (body: `{ notice_no }`)
+- BidPublicInfoService에서 `ntceSpecDocUrl1~10` + `ntceSpecFileNm` 매칭
+- "공고문" 키워드 PDF 자동 다운 → pdf-parse → Gemini → 매칭
+- UI: `AutoQualificationCheck.tsx` (cyan 톤 카드)
+- `/bids/new` lookup 후 자동 표시 (사용자 클릭으로 시작)
+
+## 재입찰 분석 (`scripts/analyze-rebids.mjs`)
+- 5년치 652건 중 23건 (3.5%) 재입찰 (`bid_ntce_ord != "000"` or `rbid_no != "000"`)
+- 첫 입찰 vs 재입찰 사정율 차이 -0.15%p — 신호 없음
+- 결론: 재입찰 분석은 별 가치 없음
+
+## 미완료 — 계약 체결 정보 (CntrctProcssIntgOpenService)
+- 활용신청 했지만 정확한 endpoint operation 이름 미확인
+- 시도한 것: getCntrctInfoListInfoCnstwk → 500/404
+- TODO: data.go.kr 문서에서 operation 정확한 이름 찾기
+- 가치 ⭐ 낮음 (낙찰 후 포기 케이스 식별 정도)
+
+---
+
 # 추가 분석 가능 목록 (미수행, 2026-05-07)
 
 데이터는 있지만 아직 분석/UI화 안 한 항목:
