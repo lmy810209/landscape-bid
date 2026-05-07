@@ -53,15 +53,19 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
       return { ...n, cls, opengDate, isFuture, knownByMe, qual };
     })
     .sort((a, b) => {
-      // 자격가능 + 미참여 + 안전형 + 미래 개찰 우선
-      const score = (x: typeof a) =>
-        (x.qual.match ? 200 : -100) +
-        (x.knownByMe ? 0 : 100) +
-        (x.cls.poolType === "안전형" ? 50 : x.cls.poolType === "혼합" ? 25 : 0) +
-        (x.isFuture ? 30 : 0);
-      const diff = score(b) - score(a);
-      if (diff !== 0) return diff;
-      return (b.opengDt ?? "").localeCompare(a.opengDt ?? "");
+      // 1. 본인 등록 / 마감 지난 건 맨 아래
+      const aDone = a.knownByMe || !a.isFuture;
+      const bDone = b.knownByMe || !b.isFuture;
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      // 2. 자격 가능 우선
+      if (a.qual.match !== b.qual.match) return a.qual.match ? -1 : 1;
+      // 3. 입찰마감 가까운 순 (오름차순) — fallback: 개찰일
+      const aClose = a.bidClseDt ?? a.opengDt ?? "";
+      const bClose = b.bidClseDt ?? b.opengDt ?? "";
+      if (aClose !== bClose) return aClose.localeCompare(bClose);
+      // 4. 같은 마감이면 안전형 우선
+      const poolScore = (p: string) => (p === "안전형" ? 2 : p === "혼합" ? 1 : 0);
+      return poolScore(b.cls.poolType) - poolScore(a.cls.poolType);
     });
 
   // 6) 일정 충돌 — 같은 개찰일 그룹화
@@ -130,13 +134,14 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
       <section>
         <h2 className="text-lg font-semibold">공고 목록 ({enriched.length}건)</h2>
         <p className="text-xs text-slate-500">
-          본인 이미 등록한 공고는 회색 표시. 안전형 + 미래 개찰 우선 정렬.
+          입찰마감 가까운 순 정렬. 본인 등록·마감 지난 건 맨 아래.
         </p>
         <div className="mt-3 overflow-x-auto rounded border border-slate-200">
           <table className="w-full text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">공고일</th>
+                <th className="px-3 py-2 text-left">입찰마감</th>
                 <th className="px-3 py-2 text-left">개찰일</th>
                 <th className="px-3 py-2 text-left">공고명</th>
                 <th className="px-3 py-2 text-left">발주처</th>
@@ -164,9 +169,35 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                     : n.isFuture && n.cls.poolType === "안전형"
                       ? "bg-emerald-50/40 font-medium"
                       : "";
+                const closeDate = n.bidClseDt?.slice(0, 10) ?? "";
+                const closeDateTime = n.bidClseDt
+                  ? `${n.bidClseDt.slice(0, 4)}-${n.bidClseDt.slice(4, 6)}-${n.bidClseDt.slice(6, 8)} ${n.bidClseDt.slice(8, 10)}:${n.bidClseDt.slice(10, 12)}`
+                  : "";
+                const closeDay = n.bidClseDt
+                  ? new Date(`${n.bidClseDt.slice(0, 4)}-${n.bidClseDt.slice(4, 6)}-${n.bidClseDt.slice(6, 8)}T${n.bidClseDt.slice(8, 10)}:${n.bidClseDt.slice(10, 12)}:00`)
+                  : null;
+                const daysToClose = closeDay
+                  ? Math.ceil((closeDay.getTime() - today.getTime()) / 86400000)
+                  : null;
+                const closeBadge =
+                  daysToClose == null
+                    ? null
+                    : daysToClose < 0
+                      ? <span className="ml-1 rounded bg-slate-200 px-1 text-[10px] text-slate-600">마감</span>
+                      : daysToClose === 0
+                        ? <span className="ml-1 rounded bg-red-100 px-1 text-[10px] font-bold text-red-700">오늘</span>
+                        : daysToClose <= 2
+                          ? <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700">D-{daysToClose}</span>
+                          : daysToClose <= 5
+                            ? <span className="ml-1 rounded bg-blue-100 px-1 text-[10px] text-blue-700">D-{daysToClose}</span>
+                            : null;
                 return (
                   <tr key={`${n.bidNtceNo}-${n.bidNtceOrd}`} className={`border-t ${rowClass}`}>
                     <td className="px-3 py-2 font-mono text-xs">{n.bidNtceDt?.slice(0, 10)}</td>
+                    <td className="px-3 py-2 font-mono text-xs" title={closeDateTime}>
+                      {closeDate || "-"}
+                      {closeBadge}
+                    </td>
                     <td className="px-3 py-2 font-mono text-xs">
                       {n.opengDate}
                       {n.isFuture && <span className="ml-1 rounded bg-blue-100 px-1 text-[10px] text-blue-700">예정</span>}

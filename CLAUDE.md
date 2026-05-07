@@ -863,3 +863,56 @@ NAS 재부팅이나 시스템 이벤트 후에도 컨테이너가 자동 재시�
 n=32라 통계 유의성은 약함. 시간 들여 본인 데이터로 재검증 필요.
 
 추천번호 자체는 적중률 ↑이지만 **낙찰률 ↑은 검증 안 됨** (적중률 ≠ 낙찰률).
+
+---
+
+# /alerts 페이지 (신규 공고 모니터링)
+
+`src/app/alerts/page.tsx` — 매 요청마다 나라장터 API 호출 (30분 메모리 캐시).
+별도 cron 불필요. 페이지 새로고침 = 최신 데이터.
+
+## 표시 컬럼
+
+`공고일 | 입찰마감 | 개찰일 | 공고명 | 발주처 | 기초금액 | 분류 | 자격 | 하한율 | 상태`
+
+**입찰마감 컬럼** (`bidClseDt`) — 사용자가 신경써야 할 진짜 데드라인. D-day 배지:
+- 오늘: 빨강 강조
+- D-1, D-2: 앰버 강조
+- D-3~D-5: 블루
+- 마감 지남: 회색 "마감"
+- 마우스오버 시 시:분까지 표시
+
+## 정렬 우선순위
+
+```ts
+1. 본인 등록 / 마감 지남 → 맨 아래
+2. 자격 가능 우선
+3. 입찰마감 가까운 순 (오름차순) — fallback: 개찰일
+4. 같은 마감 → 안전형 > 혼합 > 공격형
+```
+
+핵심: **마감 임박 + 자격 가능 + 미등록**이 가장 위. 사용자가 그 순서로 처리.
+
+## 데이터 소스
+
+`src/lib/scope2/fetchRecentNotices.ts` — `BidPublicInfoService.getBidPblancListInfoCnstwk`.
+한 번 호출 = 1 calendar month 제약. 30일 N=14 default. 30분 메모리 캐시.
+
+응답 필드 (이미 fetch 중): `bidNtceDt, bidClseDt, opengDt, bidNtceNo, bidNtceNm, dminsttNm,
+bdgtAmt, presmptPrce, sucsfbidLwltRate, sucsfbidMthdNm, mainCnsttyNm, prtcptLmtRgnNm`.
+
+## 의미
+
+- **공고일**: 게시일 (참고용)
+- **입찰마감 (`bidClseDt`)**: 입찰서 제출 마지막 시각 — **본인이 신경써야 할 진짜 데드라인**
+- **개찰일 (`opengDt`)**: 시스템 자동 발표일. 마감 1~2시간 후 즉시 결과 공개
+
+마감 = 개찰 같은 날, 1~2시간 차이 일반적.
+
+---
+
+# 로컬 / NAS / Vercel 운영 상태 (2026-05-07 기준)
+
+- **로컬 개발**: `npm run dev` 정상. 사용자가 매매 봇 NAS 부담 줄이려고 NAS 컨테이너 일시 중단 (`docker-compose down`). 이미지는 보존됨, 다시 `up -d`로 재가동 가능.
+- **NAS 메모리 압박**: 1.7GB / 가용 200MB / Swap 1.5GB 사용 중. 매매 봇(us-stock-bot, bybit_spot_bot)이 24/7 핵심.
+- **Vercel 이전 계획**: GitHub push → Vercel 무료 배포로 이전 예정. NAS 매매 봇 부담 영구 해소 + 배포 30초.
