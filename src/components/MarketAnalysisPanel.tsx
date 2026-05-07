@@ -10,6 +10,7 @@ import FinalJudgmentBox from "./FinalJudgmentBox";
 import MarketTypeCard from "./MarketTypeCard";
 import TopCompetitorsCard from "./TopCompetitorsCard";
 import AggressiveScenariosCard from "./AggressiveScenariosCard";
+import TimelineTrendCard from "./TimelineTrendCard";
 
 type Props = {
   ctx: NoticeContext | null;
@@ -67,6 +68,7 @@ export default function MarketAnalysisPanel({ ctx }: Props) {
     <div className="space-y-3">
       <FinalJudgmentBox judgment={data.final_judgment} />
       <MarketTypeCard result={data.market_type} />
+      <TimelineTrendCard trend={data.timeline} />
       <AggressiveScenariosCard result={data.aggressive} ctx={data.notice_context} />
       <TopCompetitorsCard analysis={data.top_competitors} />
     </div>

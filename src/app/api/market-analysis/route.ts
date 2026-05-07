@@ -4,6 +4,8 @@ import { classifyMarketType, type MarketTypeResult } from "@/lib/marketAnalysis/
 import { analyzeTopCompetitors, type TopCompetitorsAnalysis } from "@/lib/marketAnalysis/topCompetitors";
 import { buildAggressiveScenarios, type AggressiveScenariosResult } from "@/lib/marketAnalysis/aggressiveScenarios";
 import { judge, type FinalJudgment } from "@/lib/marketAnalysis/finalJudgment";
+import { buildTimeline, type TimelineTrend } from "@/lib/marketAnalysis/timeline";
+import { extractKeywords } from "@/lib/marketAnalysis/types";
 import type { NoticeContext, PublicWin } from "@/lib/marketAnalysis/types";
 import type { ParticipantRow } from "@/lib/marketAnalysis/effectiveCutoff";
 
@@ -16,6 +18,7 @@ export type MarketAnalysisResponse = {
   top_competitors: TopCompetitorsAnalysis;
   aggressive: AggressiveScenariosResult;
   final_judgment: FinalJudgment;
+  timeline: TimelineTrend;
 };
 
 export async function POST(req: Request) {
@@ -102,11 +105,34 @@ export async function POST(req: Request) {
   const top_competitors = analyzeTopCompetitors(allWins);
   const final_judgment = judge(market_type, aggressive);
 
+  // 시계열: 매칭 풀 (발주처 + 키워드)
+  const noticeKeywords = extractKeywords(ctx.notice_title);
+  const timelineMatched = allWins.filter((w) => {
+    if (!w.is_ansan || w.is_bangje) return false;
+    const ag =
+      w.dminstt_nm === ctx.agency ||
+      (w.dminstt_nm && (w.dminstt_nm.includes(ctx.agency) || ctx.agency.includes(w.dminstt_nm)));
+    if (!ag) return false;
+    if (noticeKeywords.length === 0) return true;
+    return noticeKeywords.some((k) => w.bid_ntce_nm?.includes(k));
+  });
+  const matchedForTimeline = timelineMatched.length >= 5
+    ? timelineMatched
+    : allWins.filter((w) => {
+        if (!w.is_ansan || w.is_bangje) return false;
+        return (
+          w.dminstt_nm === ctx.agency ||
+          (w.dminstt_nm && (w.dminstt_nm.includes(ctx.agency) || ctx.agency.includes(w.dminstt_nm)))
+        );
+      });
+  const timeline = buildTimeline(matchedForTimeline);
+
   return NextResponse.json({
     notice_context: ctx,
     market_type,
     top_competitors,
     aggressive,
     final_judgment,
+    timeline,
   } satisfies MarketAnalysisResponse);
 }
