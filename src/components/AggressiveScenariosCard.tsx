@@ -21,9 +21,10 @@ export default function AggressiveScenariosCard({
         <span className="text-xs text-slate-500">유사 공고 {result.sample_size}건 기반</span>
       </div>
 
-      {result.insurance_warning && (
-        <div className="mb-2 rounded border border-amber-300 bg-amber-100/70 px-2 py-1.5 text-xs text-amber-900">
-          ⚠ {result.insurance_warning}
+      {result.insurance_deduction ? (
+        <div className="mb-2 rounded border border-amber-400 bg-amber-100/80 px-2 py-1.5 text-xs text-amber-900">
+          <div className="mb-1 font-semibold">📌 보험료 감액 적용 공고</div>
+          <div>{result.insurance_warning}</div>
           {result.effective_cutoff_estimate != null && (
             <div className="mt-1">
               추정 effective cutoff: <strong>{result.effective_cutoff_estimate.toFixed(2)}%</strong>
@@ -32,6 +33,16 @@ export default function AggressiveScenariosCard({
               )}
             </div>
           )}
+          <div className="mt-1 text-[11px]">
+            → 90%대 사정율 권장. 88%대 시도 시 미달 위험 매우 높음.
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2 rounded border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs text-emerald-900">
+          <div className="font-semibold">📌 일반 공고 (보험료 감액 적용 X)</div>
+          <div className="mt-1 text-[11px]">
+            → 88%대 사정율 시도 영역. 상위 업체가 학습한 공격형 영역.
+          </div>
         </div>
       )}
 

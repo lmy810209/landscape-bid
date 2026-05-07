@@ -3,6 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { estimateEffectiveCutoff, isSurvivableAggressive } from "@/lib/marketAnalysis/effectiveCutoff";
+import { isInsuranceNotice } from "@/lib/marketAnalysis/noticeMethods";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +112,29 @@ export default async function SafeZonePage() {
   const survivableCount = cells.filter((c) => c.survivable).length;
   const insufficientCount = cells.filter((c) => c.notices.length < 5).length;
 
+  // 발주처별 일반/감액 비율 집계
+  type AgencyStat = { total: number; insurance: number; normal: number };
+  const byAgency: Record<string, AgencyStat> = {};
+  for (const w of allWins) {
+    if (!w.dminstt_nm) continue;
+    if (!byAgency[w.dminstt_nm]) byAgency[w.dminstt_nm] = { total: 0, insurance: 0, normal: 0 };
+    byAgency[w.dminstt_nm].total++;
+    if (isInsuranceNotice(w.bid_ntce_no)) byAgency[w.dminstt_nm].insurance++;
+    else byAgency[w.dminstt_nm].normal++;
+  }
+  const agencyRows = Object.entries(byAgency)
+    .filter(([, v]) => v.total >= 5)
+    .sort((a, b) => b[1].total - a[1].total);
+
+  // 본인 진입 영역 분포
+  const myEntries = await supabase
+    .from("public_participants")
+    .select("bid_ntce_no")
+    .eq("prcbdr_bizno", "4958603422")
+    .eq("rmrk", "정상");
+  const myInsurance = (myEntries.data ?? []).filter((p) => isInsuranceNotice(p.bid_ntce_no as string)).length;
+  const myNormal = (myEntries.data ?? []).length - myInsurance;
+
   return (
     <div className="space-y-4 p-4">
       <header>
@@ -131,6 +155,83 @@ export default async function SafeZonePage() {
           여기서 사정율 88~88.5% 시도하면 op13 매칭 풀의 절반 이상이 그 사정율 이하로 정상 진입했음.
           <strong> 낙찰 가능을 의미하지 않음. 시도 참고 영역</strong>.
         </p>
+      </section>
+
+      {/* 본인 진입 영역 분포 */}
+      <section className="rounded border-2 border-amber-300 bg-amber-50/40 p-3">
+        <h2 className="mb-2 text-sm font-semibold text-amber-900">📍 본인 진입 영역 분포</h2>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded border bg-white p-2">
+            <div className="text-xs text-slate-500">보험료 감액 공고 진입</div>
+            <div className="font-bold text-slate-800">
+              {myInsurance}건{" "}
+              <span className="text-xs font-normal text-slate-500">
+                (90%대 보수형)
+              </span>
+            </div>
+          </div>
+          <div className="rounded border bg-white p-2">
+            <div className="text-xs text-slate-500">일반 공고 진입 (88%대 영역)</div>
+            <div className={`font-bold ${myNormal === 0 ? "text-red-700" : "text-slate-800"}`}>
+              {myNormal}건{" "}
+              {myNormal === 0 && (
+                <span className="text-xs font-normal text-red-700">⚠ 미개척</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-600">
+          상위 업체는 일반 공고에서 88%대 사정율로 진입. 본인이 일반 공고 미진입 시 그 영역에서 학습 기회 X.
+        </p>
+      </section>
+
+      {/* 발주처별 일반/감액 비율 */}
+      <section className="rounded border-2 border-slate-300 bg-white p-3">
+        <h2 className="mb-2 text-sm font-semibold text-slate-800">🏛️ 발주처별 일반/감액 비율</h2>
+        <p className="mb-2 text-xs text-slate-600">
+          일반 비율 높은 발주처 = 88%대 시도해야 할 미개척 영역
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="px-2 py-1 text-left">발주처</th>
+                <th className="px-2 py-1 text-right">총 공고</th>
+                <th className="px-2 py-1 text-right">감액</th>
+                <th className="px-2 py-1 text-right">일반</th>
+                <th className="px-2 py-1 text-right">일반 비율</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agencyRows.map(([agency, v]) => {
+                const ratio = (v.normal / v.total) * 100;
+                return (
+                  <tr key={agency} className="border-t">
+                    <td className="px-2 py-1.5">{agency}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">{v.total}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">
+                      {v.insurance}
+                    </td>
+                    <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{v.normal}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">
+                      <span
+                        className={
+                          ratio >= 75
+                            ? "rounded bg-orange-100 px-1.5 py-0.5 font-bold text-orange-900"
+                            : ratio >= 60
+                              ? "text-amber-700 font-semibold"
+                              : "text-slate-700"
+                        }
+                      >
+                        {ratio.toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <div className="overflow-x-auto rounded border">
