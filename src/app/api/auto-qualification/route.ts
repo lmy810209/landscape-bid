@@ -41,20 +41,29 @@ async function fetchNoticeMeta(bidNtceNo: string): Promise<ApiItem | null> {
 }
 
 function extractNoticeFile(item: ApiItem): FileRef | null {
-  // ntceSpecDocUrl1~10 + ntceSpecFileNm1~10 — "공고문" 키워드 첫 매치
+  // ntceSpecDocUrl1~10 + ntceSpecFileNm1~10 수집
+  const all: FileRef[] = [];
   for (let i = 1; i <= 10; i++) {
     const url = item[`ntceSpecDocUrl${i}`] as string | undefined;
     const name = item[`ntceSpecFileNm${i}`] as string | undefined;
-    if (!url || !name) continue;
-    if (name.includes("공고문") || name.startsWith("공고")) {
-      return { url, name };
-    }
+    if (url && name) all.push({ url, name });
   }
-  // fallback: 첫 번째 파일
-  const url = item.ntceSpecDocUrl1 as string | undefined;
-  const name = item.ntceSpecFileNm1 as string | undefined;
-  if (url && name) return { url, name };
-  return null;
+  if (all.length === 0) return null;
+
+  // 우선순위:
+  // 1. 공고문 키워드 + .pdf 확장자
+  // 2. 공고문 키워드 (확장자 무관 — .hwp일 수도 있지만 다운로드 시 magic byte 검증)
+  // 3. .pdf 확장자만
+  // 4. 첫 번째
+  const isNotice = (n: string) => n.includes("공고문") || n.startsWith("공고");
+  const isPdf = (n: string) => n.toLowerCase().endsWith(".pdf");
+
+  return (
+    all.find((f) => isNotice(f.name) && isPdf(f.name)) ??
+    all.find((f) => isPdf(f.name)) ??
+    all.find((f) => isNotice(f.name)) ??
+    all[0]
+  );
 }
 
 async function downloadPdf(url: string): Promise<Buffer> {
