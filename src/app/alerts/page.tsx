@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 const ANSAN = /안산/;
 const BANGJE = /(방제|병해충|살균|살충|소독|약제살포)/;
 
+// 조경 관련 키워드 (공고명에 하나라도 있으면 통과)
+const LANDSCAPE = /(조경|공원|녹지|가로수|잔디|수목|화단|식재|전정|풀깎기|예초|꽃|나무|정원|숲길|등산로|쌈지)/;
+
+// 조경 외 명백한 키워드 (있으면 제외)
+const NON_LANDSCAPE = /(횡단보도|신호등|방수|도로포장|아스팔트|전기공사|통신|상수도|하수도|옹벽|배수관|준설|콘크리트|철근|건축|구조물 보강|설비|냉난방|승강기|엘리베이터|도장공사 \(건물\)|지붕)/;
+
 type SearchParams = { days?: string };
 
 export default async function AlertsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -24,10 +30,18 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
     fetchError = e instanceof Error ? e.message : "조회 실패";
   }
 
-  // 2) 안산 ∩ 비방제 필터
-  const ansanNotices = raw.filter(
-    (r) => ANSAN.test(r.dminsttNm ?? "") && !BANGJE.test(r.bidNtceNm ?? ""),
-  );
+  // 2) 안산 ∩ 비방제 ∩ 조경 관련 필터
+  // - 조경 키워드 매치하면 통과
+  // - 조경 키워드 없고 NON_LANDSCAPE 키워드 있으면 제외
+  // - 조경 키워드 없고 NON_LANDSCAPE도 없으면 통과 (모호 — 사용자 판단 가능하게)
+  const ansanNotices = raw.filter((r) => {
+    if (!ANSAN.test(r.dminsttNm ?? "")) return false;
+    const name = r.bidNtceNm ?? "";
+    if (BANGJE.test(name)) return false;
+    if (LANDSCAPE.test(name)) return true;
+    if (NON_LANDSCAPE.test(name)) return false;
+    return true; // 모호한 건 보여주기
+  });
 
   // 3) 키워드 분류 (1시간 메모리 캐시 — 매번 5,300 row 페이징 방지)
   const supabase = createClient();
