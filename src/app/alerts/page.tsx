@@ -10,13 +10,12 @@ export const dynamic = "force-dynamic";
 const ANSAN = /안산/;
 const BANGJE = /(방제|병해충|살균|살충|소독|약제살포)/;
 
-// 조경 관련 키워드 (공고명에 하나라도 있으면 통과)
+// 조경 핵심 키워드 — 이게 있어야 통과 (엄격한 화이트리스트)
+// "공원" 단독은 제외 (공원 화장실/주차장/시설보수 등 비조경 케이스 많음)
+// 대신 "공원" + 조경 동사 조합 ("공원 조경관리", "공원 풀깎기")은 다른 키워드로 잡힘
 const LANDSCAPE =
-  /(조경|공원|녹지|가로수|잔디|수목|화단|식재|전정|풀깎기|예초|꽃|나무|정원|숲길|등산로|쌈지|꽃길|어린이공원|놀이|놀이터|놀이시설|가로화단|화훼|텃밭|식물|꽃밭|제초|경관|친환경|푸른|초화)/;
+  /(조경|녹지|가로수|잔디|수목|화단|식재|전정|풀깎기|예초|제초|화훼|꽃길|꽃밭|초화|텃밭|숲길|등산로|쌈지|가로화단|꽃묘|관목|교목|방초|초지|조림|가지치기|식물|정원수|관리공사|유지관리)/;
 
-// 조경 외 명백한 키워드 (있으면 제외)
-const NON_LANDSCAPE =
-  /(횡단보도|신호등|방수|도로포장|아스팔트|전기공사|통신|상수도|하수도|옹벽|배수관|준설|콘크리트|철근|건축|건축물|구조물 보강|설비|냉난방|승강기|엘리베이터|도장공사 \(건물\)|지붕|석축|수도|수도관|수도계량기|상수관|하수관|상수도관|하수도관|가스|소방|농업기반|농업용수|농수로|수리시설|관정|양수기|펌프|정수장|배수지|배수펌프|가로등|보안등|보도블록|차선|교량|교차로|교통안전|CCTV|울타리|펜스|방음벽|방음판|초소|간판|표지판|간선|배전|상수원|취수장|수문|문화재|박물관|체육관|체육시설 보수|운동기구 교체|놀이기구 교체)/;
 
 type SearchParams = { days?: string };
 
@@ -32,17 +31,15 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
     fetchError = e instanceof Error ? e.message : "조회 실패";
   }
 
-  // 2) 안산 ∩ 비방제 ∩ 조경 관련 필터
-  // - 조경 키워드 매치하면 통과
-  // - 조경 키워드 없고 NON_LANDSCAPE 키워드 있으면 제외
-  // - 조경 키워드 없고 NON_LANDSCAPE도 없으면 통과 (모호 — 사용자 판단 가능하게)
+  // 2) 안산 ∩ 비방제 ∩ 조경 화이트리스트 필터
+  // - 조경 키워드 있으면 통과
+  // - 조경 키워드 없으면 거부 (보수적)
+  // - "공원" 단독은 LANDSCAPE 안 들어감 (공원 화장실/주차장 등 거르기 위함)
   const ansanNotices = raw.filter((r) => {
     if (!ANSAN.test(r.dminsttNm ?? "")) return false;
     const name = r.bidNtceNm ?? "";
     if (BANGJE.test(name)) return false;
-    if (LANDSCAPE.test(name)) return true;
-    if (NON_LANDSCAPE.test(name)) return false;
-    return true; // 모호한 건 보여주기
+    return LANDSCAPE.test(name);
   });
 
   // 3) 키워드 분류 (1시간 메모리 캐시 — 매번 5,300 row 페이징 방지)
