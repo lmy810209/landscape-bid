@@ -60,12 +60,17 @@ function extractNoticeFile(item: ApiItem): FileRef | null {
 async function downloadPdf(url: string): Promise<Buffer> {
   const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`PDF 다운로드 실패: HTTP ${r.status}`);
-  const ct = r.headers.get("content-type") ?? "";
-  if (!ct.includes("pdf")) {
-    throw new Error(`PDF 아님: Content-Type ${ct}`);
-  }
   const ab = await r.arrayBuffer();
-  return Buffer.from(ab);
+  const buf = Buffer.from(ab);
+  const head = buf.subarray(0, 4).toString("ascii");
+  if (head.startsWith("%PDF")) return buf;
+  // ZIP은 PK\x03\x04 또는 PK\x05\x06 시작 — 조달청이 첨부를 zip 패키징한 경우
+  if (head.startsWith("PK")) {
+    throw new Error(
+      "공고 첨부가 ZIP 파일입니다 (조달청 일부 공고). 직접 다운로드 후 위 '자격 자동 체크' 카드에서 PDF 수동 업로드 권장.",
+    );
+  }
+  throw new Error(`PDF 형식 아님 (첫 4바이트: ${head})`);
 }
 
 export async function POST(req: Request) {
