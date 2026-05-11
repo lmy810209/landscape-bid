@@ -151,18 +151,18 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
         </p>
         <div className="mt-3 overflow-x-auto rounded border border-slate-200">
           <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-xs text-slate-600">
+            <thead className="bg-slate-100 text-[11px] text-slate-600 sm:text-xs">
               <tr>
-                <th className="px-3 py-2 text-left">공고일</th>
-                <th className="px-3 py-2 text-left">입찰마감</th>
-                <th className="px-3 py-2 text-left">개찰일</th>
-                <th className="px-3 py-2 text-left">공고명</th>
-                <th className="px-3 py-2 text-left">발주처</th>
-                <th className="px-3 py-2 text-right">기초금액</th>
-                <th className="px-3 py-2 text-center">분류</th>
-                <th className="px-3 py-2 text-center">자격</th>
-                <th className="px-3 py-2 text-right">하한율</th>
-                <th className="px-3 py-2 text-center">상태</th>
+                <th className="hidden px-2 py-2 text-left sm:table-cell sm:px-3">공고일</th>
+                <th className="px-2 py-2 text-left sm:px-3">입찰마감</th>
+                <th className="hidden px-2 py-2 text-left md:table-cell sm:px-3">개찰일</th>
+                <th className="px-2 py-2 text-left sm:px-3">공고명</th>
+                <th className="hidden px-2 py-2 text-left sm:table-cell sm:px-3">발주처</th>
+                <th className="hidden px-2 py-2 text-right md:table-cell sm:px-3">기초금액</th>
+                <th className="px-2 py-2 text-center sm:px-3">분류</th>
+                <th className="px-2 py-2 text-center sm:px-3">자격</th>
+                <th className="hidden px-2 py-2 text-right lg:table-cell sm:px-3">하한율</th>
+                <th className="px-2 py-2 text-center sm:px-3">상태</th>
               </tr>
             </thead>
             <tbody>
@@ -206,37 +206,39 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                             : null;
                 return (
                   <tr key={`${n.bidNtceNo}-${n.bidNtceOrd}`} className={`border-t ${rowClass}`}>
-                    <td className="px-3 py-2 font-mono text-xs">{n.bidNtceDt?.slice(0, 10)}</td>
-                    <td className="px-3 py-2 font-mono text-xs" title={closeDateTime}>
-                      {closeDate || "-"}
+                    <td className="hidden px-2 py-2 font-mono text-[11px] sm:table-cell sm:px-3 sm:text-xs">
+                      {n.bidNtceDt?.slice(0, 10)}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-[11px] sm:px-3 sm:text-xs" title={closeDateTime}>
+                      {closeDate?.slice(5) || "-"}
                       {closeBadge}
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs">
+                    <td className="hidden px-2 py-2 font-mono text-[11px] md:table-cell sm:px-3 sm:text-xs">
                       {n.opengDate}
                       {n.isFuture && <span className="ml-1 rounded bg-blue-100 px-1 text-[10px] text-blue-700">예정</span>}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-2 sm:px-3">
                       <Link
                         href={`/bids/new?bidNtceNo=${n.bidNtceNo}`}
-                        className="hover:underline"
+                        className="text-[13px] hover:underline sm:text-sm"
                         title="이 공고로 새 입찰 등록"
                       >
                         {n.bidNtceNm.length > 38 ? n.bidNtceNm.slice(0, 38) + "…" : n.bidNtceNm}
                       </Link>
                       <div className="text-[10px] font-mono text-slate-400">{n.bidNtceNo}</div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-600">
+                    <td className="hidden px-2 py-2 text-xs text-slate-600 sm:table-cell sm:px-3">
                       {(n.dminsttNm ?? "").replace("경기도 ", "").replace("경기도교육청 ", "")}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="hidden px-2 py-2 text-right font-mono text-xs md:table-cell sm:px-3">
                       {n.bdgtAmt ? Number(n.bdgtAmt).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`rounded px-1.5 py-0.5 text-xs ${badgeBg}`}>
+                    <td className="px-2 py-2 text-center sm:px-3">
+                      <span className={`rounded px-1.5 py-0.5 text-[11px] sm:text-xs ${badgeBg}`}>
                         {n.cls.poolType}
                       </span>
                       {n.cls.matchedKeywords.length > 0 && (
-                        <div className="mt-0.5 text-[10px] text-slate-500">
+                        <div className="mt-0.5 hidden text-[10px] text-slate-500 sm:block">
                           {n.cls.matchedKeywords.slice(0, 2).join(", ")}
                         </div>
                       )}
@@ -250,12 +252,12 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                         {n.qual.match ? "가능" : "불가"}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-xs">
+                    <td className="hidden px-2 py-2 text-right font-mono text-xs lg:table-cell sm:px-3">
                       {n.sucsfbidLwltRate ? `${n.sucsfbidLwltRate}%` : "-"}
                     </td>
-                    <td className="px-3 py-2 text-center text-xs">
+                    <td className="px-2 py-2 text-center text-xs sm:px-3">
                       {n.knownByMe ? (
-                        <span className="text-slate-400">등록됨</span>
+                        <span className="text-[11px] text-slate-400 sm:text-xs">등록됨</span>
                       ) : (
                         <Link
                           href={`/bids/new?bidNtceNo=${n.bidNtceNo}`}

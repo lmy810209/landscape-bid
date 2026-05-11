@@ -235,16 +235,16 @@ export default async function SafeZonePage() {
       </section>
 
       <div className="overflow-x-auto rounded border">
-        <table className="w-full text-xs">
+        <table className="w-full text-[11px] sm:text-xs">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
               <th className="px-2 py-2 text-left">발주처</th>
               <th className="px-2 py-2 text-left">키워드</th>
-              <th className="px-2 py-2 text-left">금액대</th>
-              <th className="px-2 py-2 text-right">매칭 공고</th>
-              <th className="px-2 py-2 text-right">cutoff median</th>
-              <th className="px-2 py-2 text-right">cutoff P25</th>
-              <th className="px-2 py-2 text-right">88.5% 미달위험</th>
+              <th className="hidden px-2 py-2 text-left sm:table-cell">금액대</th>
+              <th className="px-2 py-2 text-right">매칭</th>
+              <th className="hidden px-2 py-2 text-right md:table-cell">중앙</th>
+              <th className="hidden px-2 py-2 text-right md:table-cell">P25</th>
+              <th className="px-2 py-2 text-right">미달위험</th>
               <th className="px-2 py-2 text-center">판정</th>
             </tr>
           </thead>
@@ -253,12 +253,12 @@ export default async function SafeZonePage() {
               <tr key={i} className={`border-t ${c.survivable ? "bg-violet-50/40" : ""}`}>
                 <td className="px-2 py-1.5">{c.agency.split(" ").slice(-1)[0]}</td>
                 <td className="px-2 py-1.5">{c.keyword}</td>
-                <td className="px-2 py-1.5">{c.bucket}</td>
+                <td className="hidden px-2 py-1.5 sm:table-cell">{c.bucket}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{c.notices.length}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">
+                <td className="hidden px-2 py-1.5 text-right tabular-nums md:table-cell">
                   {c.cutoff_median != null ? c.cutoff_median.toFixed(2) + "%" : "—"}
                 </td>
-                <td className="px-2 py-1.5 text-right tabular-nums">
+                <td className="hidden px-2 py-1.5 text-right tabular-nums md:table-cell">
                   {c.cutoff_p25 != null ? c.cutoff_p25.toFixed(2) + "%" : "—"}
                 </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">

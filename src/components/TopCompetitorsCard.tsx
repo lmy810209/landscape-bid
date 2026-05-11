@@ -14,17 +14,17 @@ export default function TopCompetitorsCard({ analysis }: { analysis: TopCompetit
       <h3 className="mb-2 text-sm font-semibold text-purple-900">🏢 상위업체 패턴 (5년)</h3>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-[11px] sm:text-xs">
           <thead>
             <tr className="border-b text-left text-slate-600">
               <th className="px-2 py-1">업체</th>
-              <th className="px-2 py-1 text-right">총 낙찰</th>
-              <th className="px-2 py-1 text-right">안산비율</th>
+              <th className="px-2 py-1 text-right">낙찰</th>
+              <th className="hidden px-2 py-1 text-right sm:table-cell">안산%</th>
               <th className="px-2 py-1 text-right">평균</th>
-              <th className="px-2 py-1 text-right">중앙값</th>
-              <th className="px-2 py-1 text-right">P25~P75</th>
-              <th className="px-2 py-1">주력 발주처</th>
-              <th className="px-2 py-1">주력 키워드</th>
+              <th className="hidden px-2 py-1 text-right md:table-cell">중앙</th>
+              <th className="hidden px-2 py-1 text-right lg:table-cell">P25~P75</th>
+              <th className="hidden px-2 py-1 md:table-cell">발주처</th>
+              <th className="hidden px-2 py-1 sm:table-cell">키워드</th>
             </tr>
           </thead>
           <tbody>
@@ -32,16 +32,16 @@ export default function TopCompetitorsCard({ analysis }: { analysis: TopCompetit
               <tr key={c.bizno} className="border-b text-slate-800">
                 <td className="px-2 py-1 font-medium">{c.name}</td>
                 <td className="px-2 py-1 text-right tabular-nums">{c.total_wins}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{(c.ansan_ratio * 100).toFixed(0)}%</td>
+                <td className="hidden px-2 py-1 text-right tabular-nums sm:table-cell">{(c.ansan_ratio * 100).toFixed(0)}%</td>
                 <td className="px-2 py-1 text-right tabular-nums">{fmtPct(c.avg_rate)}</td>
-                <td className="px-2 py-1 text-right tabular-nums">{fmtPct(c.median_rate)}</td>
-                <td className="px-2 py-1 text-right tabular-nums">
+                <td className="hidden px-2 py-1 text-right tabular-nums md:table-cell">{fmtPct(c.median_rate)}</td>
+                <td className="hidden px-2 py-1 text-right tabular-nums lg:table-cell">
                   {fmtPct(c.p25_rate)} ~ {fmtPct(c.p75_rate)}
                 </td>
-                <td className="px-2 py-1 text-[11px]">
+                <td className="hidden px-2 py-1 text-[11px] md:table-cell">
                   {c.top_agencies.slice(0, 2).map((a) => `${a.name.split(" ").pop()} ${a.count}`).join(" / ")}
                 </td>
-                <td className="px-2 py-1 text-[11px]">
+                <td className="hidden px-2 py-1 text-[11px] sm:table-cell">
                   {c.top_keywords.slice(0, 3).map((k) => `${k.name} ${k.count}`).join(" / ")}
                 </td>
               </tr>
@@ -49,16 +49,16 @@ export default function TopCompetitorsCard({ analysis }: { analysis: TopCompetit
             <tr className="bg-blue-50 font-semibold text-slate-800">
               <td className="px-2 py-1">{analysis.my_stats.name} (본인)</td>
               <td className="px-2 py-1 text-right tabular-nums">{analysis.my_stats.total_wins}</td>
-              <td className="px-2 py-1 text-right tabular-nums">{(analysis.my_stats.ansan_ratio * 100).toFixed(0)}%</td>
+              <td className="hidden px-2 py-1 text-right tabular-nums sm:table-cell">{(analysis.my_stats.ansan_ratio * 100).toFixed(0)}%</td>
               <td className="px-2 py-1 text-right tabular-nums">{fmtPct(analysis.my_stats.avg_rate)}</td>
-              <td className="px-2 py-1 text-right tabular-nums">{fmtPct(analysis.my_stats.median_rate)}</td>
-              <td className="px-2 py-1 text-right tabular-nums">
+              <td className="hidden px-2 py-1 text-right tabular-nums md:table-cell">{fmtPct(analysis.my_stats.median_rate)}</td>
+              <td className="hidden px-2 py-1 text-right tabular-nums lg:table-cell">
                 {fmtPct(analysis.my_stats.p25_rate)} ~ {fmtPct(analysis.my_stats.p75_rate)}
               </td>
-              <td className="px-2 py-1 text-[11px]">
+              <td className="hidden px-2 py-1 text-[11px] md:table-cell">
                 {analysis.my_stats.top_agencies.slice(0, 2).map((a) => `${a.name.split(" ").pop()} ${a.count}`).join(" / ") || "—"}
               </td>
-              <td className="px-2 py-1 text-[11px]">
+              <td className="hidden px-2 py-1 text-[11px] sm:table-cell">
                 {analysis.my_stats.top_keywords.slice(0, 3).map((k) => `${k.name} ${k.count}`).join(" / ") || "—"}
               </td>
             </tr>

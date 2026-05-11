@@ -76,15 +76,14 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">새빛조경 입찰 도구</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">새빛조경 입찰 도구</h1>
         <p className="mt-1 text-sm text-slate-600">
           매일 5분 — 오늘 들어갈 공고 확인 → 클릭 → 자동 채움 → 저장.
-          입찰 대행 1.5% 수수료를 자체 운영으로 절약합니다.
         </p>
       </header>
 
       {/* 누적 통계 — 한눈에 ROI */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-4">
         <Stat label="누적 시도" value={`${total}건`} sub="2025년부터" />
         <Stat
           label="낙찰"
