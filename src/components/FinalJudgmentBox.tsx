@@ -21,16 +21,25 @@ export default function FinalJudgmentBox({ judgment }: { judgment: FinalJudgment
   return (
     <div className="rounded-lg border-2 border-slate-300 bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-base font-bold text-slate-800">📋 최종 판단</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className={`rounded border-2 px-3 py-2 ${goColor}`}>
-          <div className="text-xs font-medium opacity-70">참여 판단</div>
-          <div className="text-2xl font-bold">{judgment.go_status}</div>
+      <div className="space-y-2">
+        <div className={`rounded border-2 px-4 py-3 ${goColor}`}>
+          <div className="text-xs font-semibold opacity-70">① 참여 판단 (먼저 결정)</div>
+          <div className="text-3xl font-bold">{judgment.go_status}</div>
         </div>
-        <div className={`rounded border-2 px-3 py-2 ${stratColor}`}>
-          <div className="text-xs font-medium opacity-70">가격 전략</div>
-          <div className="text-2xl font-bold">{judgment.strategy}</div>
+        <div className={`rounded border px-3 py-2 ${stratColor}`}>
+          <div className="text-[11px] font-medium opacity-70">② 가격 전략</div>
+          <div className="text-lg font-semibold">{judgment.strategy}</div>
         </div>
       </div>
+      {judgment.warnings.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {judgment.warnings.map((w, i) => (
+            <div key={i} className="rounded border border-red-400 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="mt-3 space-y-1 text-sm">
         <div>
           <span className="font-semibold text-slate-600">추천 이유: </span>

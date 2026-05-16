@@ -27,14 +27,25 @@ export function loadNoticeMethods(): Record<string, NoticeMethodInfo> {
   }
 }
 
+// 텍스트(sucsfbidMthdNm/bid_method) 한 줄에서 보험료 감액 적용 여부 판단.
+// 캐시에 없는 신규 공고도 lookup 결과 텍스트로 즉시 판단 가능.
+export function detectInsuranceFromText(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return (
+    text.includes("소액수의견적") &&
+    (text.includes("국민연금") ||
+      text.includes("감액") ||
+      text.includes("보험료") ||
+      text.includes("합산액"))
+  );
+}
+
 export function isInsuranceNotice(bidNtceNo: string): boolean {
   const cache = loadNoticeMethods();
-  const m = cache[bidNtceNo]?.sucsfbid_method;
-  if (!m) return false;
-  return (
-    m.includes("소액수의견적") &&
-    (m.includes("국민연금") || m.includes("감액") || m.includes("보험료") || m.includes("합산액"))
-  );
+  const info = cache[bidNtceNo];
+  if (!info) return false;
+  // sucsfbid_method 우선, 없으면 bid_method
+  return detectInsuranceFromText(info.sucsfbid_method) || detectInsuranceFromText(info.bid_method);
 }
 
 // 발주처별 일반/감액 비율 집계 (한 번만 계산해서 캐시)

@@ -10,10 +10,11 @@ import {
   classifyNoticeByKeywords,
 } from "@/lib/analysis/scope2";
 import PoolPredictor from "@/components/PoolPredictor";
+import { MY_BIZNO } from "@/lib/config/myCompany";
+import { buildHeadToHead } from "@/lib/marketAnalysis/headToHead";
+import { TOP5_COMPETITORS } from "@/lib/marketAnalysis/topCompetitors";
 
 export const dynamic = "force-dynamic";
-
-const MY_BIZNO = "4958603422"; // 새빛조경
 
 export default async function CompetitorsPage() {
   const supabase = createClient();
@@ -86,6 +87,21 @@ export default async function CompetitorsPage() {
     myBidRates.length > 0
       ? [...myBidRates].sort((a, b) => a - b)[Math.floor(myBidRates.length / 2)]
       : null;
+
+  // 본인 vs 상위 5명 직접 매칭 (같은 공고 둘 다 정상 진입)
+  const h2hSummaries = TOP5_COMPETITORS.map((c) =>
+    buildHeadToHead(
+      participants.map((p) => ({
+        bid_ntce_no: p.bid_ntce_no,
+        prcbdr_bizno: p.prcbdr_bizno ?? "",
+        openg_rank: p.openg_rank ?? null,
+        bidprcrt: p.bidprcrt != null ? Number(p.bidprcrt) : null,
+      })),
+      MY_BIZNO,
+      c.bizno,
+      c.name,
+    ),
+  ).filter((h) => h.total_overlap > 0);
 
   // 풀 통계
   const myCompetitor = competitors.find((c) => c.bizno === MY_BIZNO);
@@ -173,11 +189,11 @@ export default async function CompetitorsPage() {
       <section>
         <h1 className="text-2xl font-semibold">안산 비방제 경쟁 풀 분석</h1>
         <p className="mt-1 text-sm text-slate-600">
-          공공데이터포털 낙찰정보서비스로 수집한 <strong>3년치 안산 비방제 공사 낙찰 {totalWins}건</strong>{" "}
+          공공데이터포털 낙찰정보서비스로 수집한 <strong>5년치 안산 비방제 공사 낙찰 {totalWins}건</strong>{" "}
           ({competitorCount}개 업체). 본인 회사가 이 풀의 어디에 위치하는지, 누가 반복 경쟁자인지 파악합니다.
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          ※ 27/68명 스캔 완료분 기준. 나머지 41명은 추후 보강.
+          ※ 5년 누적 (2021~2026).
         </p>
       </section>
 
@@ -188,7 +204,7 @@ export default async function CompetitorsPage() {
         <section className="rounded border border-emerald-200 bg-emerald-50/50 p-4">
           <h2 className="text-base font-semibold">본인(새빛조경) 정상 투찰 패턴</h2>
           <p className="mt-1 text-xs text-slate-600">
-            scope 2 API에서 추출한 본인의 정상 투찰 {myParticipantRates.length}건 (3년).
+            scope 2 API에서 추출한 본인의 정상 투찰 {myParticipantRates.length}건 (5년).
             본인 DB 19건과 별개 — DB는 미달·순위권밖 편중 표본이라 분포가 좁아 보임. 실제 본인은 더 광범위하게 시도 중.
           </p>
           {(() => {
@@ -393,7 +409,7 @@ export default async function CompetitorsPage() {
         <section className="rounded border border-rose-200 bg-rose-50/40 p-4">
           <h2 className="text-base font-semibold">본인 미참여 공고 분석 (놓친 기회)</h2>
           <p className="mt-1 text-xs text-slate-600">
-            안산∩비방제 199건 중 본인이 안 들어간 공고. 본인 시도 빈도 증가가 가장 큰 개선 여지 — 아래 분류로 우선 타겟 도출.
+            안산∩비방제 652건 중 본인이 안 들어간 공고. 본인 시도 빈도 증가가 가장 큰 개선 여지 — 아래 분류로 우선 타겟 도출.
           </p>
 
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -575,7 +591,7 @@ export default async function CompetitorsPage() {
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <Card label="총 정상 참여자" value={`${partRates.length}명`} sub={`${ansanNoticeNos.length} 공고 × 평균 ${(partRates.length / Math.max(1, ansanNoticeNos.length)).toFixed(1)}명`} />
-            <Card label="새빛조경 정상 투찰" value={`${myParticipantRates.length}회`} sub="3년 누적" highlight="green" />
+            <Card label="새빛조경 정상 투찰" value={`${myParticipantRates.length}회`} sub="5년 누적" highlight="green" />
             <Card
               label="본인 median 투찰률"
               value={myPartMedian != null ? `${myPartMedian.toFixed(2)}%` : "n/a"}
@@ -624,7 +640,7 @@ export default async function CompetitorsPage() {
       {/* 요약 카드 */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card label="풀 크기" value={`${totalWins}건`} sub={`연 ${(totalWins / 3).toFixed(0)}건`} />
-        <Card label="고유 낙찰자" value={`${competitorCount}명`} sub="3년 누적" />
+        <Card label="고유 낙찰자" value={`${competitorCount}명`} sub="5년 누적" />
         <Card
           label="풀 median 낙찰률"
           value={`${poolMedian.toFixed(2)}%`}
@@ -645,7 +661,7 @@ export default async function CompetitorsPage() {
           <div className="font-medium text-amber-900">본인 회사 (새빛조경) 위치</div>
           <div className="mt-2 space-y-1 text-amber-800">
             <div>
-              · 3년 안산 비방제 낙찰: <strong>{myCompetitor.wins}건</strong>{" "}
+              · 5년 안산 비방제 낙찰: <strong>{myCompetitor.wins}건</strong>{" "}
               ({competitors.findIndex((c) => c.bizno === MY_BIZNO) + 1}위 / {competitorCount}명)
             </div>
             <div>
@@ -663,7 +679,7 @@ export default async function CompetitorsPage() {
       {/* 낙찰률 히스토그램 */}
       <section>
         <h2 className="text-lg font-semibold">낙찰률 분포 (예정가격 대비)</h2>
-        <p className="mt-1 text-xs text-slate-500">3년치 {totalWins}건. 0.5%p 단위 bin.</p>
+        <p className="mt-1 text-xs text-slate-500">5년치 {totalWins}건. 0.5%p 단위 bin.</p>
         <div className="mt-3 space-y-1 rounded border border-slate-200 bg-slate-50 p-3">
           {histogram.map((b) => (
             <div key={b.rangeStart} className="flex items-center gap-2 text-xs">
@@ -682,11 +698,61 @@ export default async function CompetitorsPage() {
         </div>
       </section>
 
+
+      {/* 본인 vs 상위 5명 직접 매칭 */}
+      {h2hSummaries.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold">⚔️ 본인 vs 상위 5명 — 같은 공고 직접 매칭</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            같은 공고에 둘 다 정상 진입한 케이스만. 평균 차이가 마이너스면 본인이 더 공격적으로 (낮게) 썼다는 뜻.
+          </p>
+          <div className="mt-3 overflow-x-auto rounded border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100 text-xs text-slate-600">
+                <tr>
+                  <th className="px-3 py-2 text-left">경쟁자</th>
+                  <th className="px-3 py-2 text-right">겹친 공고</th>
+                  <th className="px-3 py-2 text-right">본인 평균</th>
+                  <th className="px-3 py-2 text-right">상대 평균</th>
+                  <th className="px-3 py-2 text-right">평균 차이</th>
+                  <th className="hidden px-3 py-2 text-center sm:table-cell">본인 더 낮음</th>
+                  <th className="hidden px-3 py-2 text-center sm:table-cell">상대 더 낮음</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {h2hSummaries.map((h) => (
+                  <tr key={h.opp_bizno}>
+                    <td className="px-3 py-2 font-medium">{h.opp_name}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{h.total_overlap}건</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{h.avg_my_rate?.toFixed(2)}%</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{h.avg_opp_rate?.toFixed(2)}%</td>
+                    <td className={`px-3 py-2 text-right tabular-nums font-medium ${
+                      (h.avg_gap_pp ?? 0) > 0 ? "text-red-600" : "text-emerald-600"
+                    }`}>
+                      {(h.avg_gap_pp ?? 0) > 0 ? "+" : ""}{h.avg_gap_pp?.toFixed(2)}%p
+                    </td>
+                    <td className="hidden px-3 py-2 text-center tabular-nums text-emerald-700 sm:table-cell">
+                      {h.my_lower_count}
+                    </td>
+                    <td className="hidden px-3 py-2 text-center tabular-nums text-red-700 sm:table-cell">
+                      {h.opp_lower_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            ※ 같은 공고에 둘 다 정상 진입한 케이스만. 미달은 op13 데이터에 안 잡혀 제외됨.
+          </p>
+        </section>
+      )}
+
       {/* 반복 경쟁자 Top 20 */}
       <section>
         <h2 className="text-lg font-semibold">반복 경쟁자 Top 20</h2>
         <p className="mt-1 text-xs text-slate-500">
-          3년 안산 비방제 낙찰 건수 기준. 어제 공고 등수 표시.
+          5년 안산 비방제 낙찰 건수 기준. 어제 공고 등수 표시.
         </p>
         <div className="mt-3 overflow-x-auto rounded border border-slate-200">
           <table className="w-full text-sm">
@@ -694,7 +760,7 @@ export default async function CompetitorsPage() {
               <tr>
                 <th className="px-3 py-2 text-right">#</th>
                 <th className="px-3 py-2 text-left">업체</th>
-                <th className="px-3 py-2 text-right">3년 낙찰</th>
+                <th className="px-3 py-2 text-right">5년 낙찰</th>
                 <th className="px-3 py-2 text-right">연 환산</th>
                 <th className="px-3 py-2 text-right">낙찰률 median</th>
                 <th className="px-3 py-2 text-right">낙찰률 범위 (P25~P75)</th>
@@ -899,7 +965,7 @@ export default async function CompetitorsPage() {
       {/* 발주처별 Top 5 (참고용) */}
       <section>
         <h2 className="text-lg font-semibold">발주처별 자주 낙찰하는 업체 Top 5 (참고)</h2>
-        <p className="mt-1 text-xs text-slate-500">3년 낙찰 건수 기준.</p>
+        <p className="mt-1 text-xs text-slate-500">5년 낙찰 건수 기준.</p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {agencies.slice(0, 8).map((ag) => (
             <div key={ag.agency} className="rounded border border-slate-200 p-3 text-sm">

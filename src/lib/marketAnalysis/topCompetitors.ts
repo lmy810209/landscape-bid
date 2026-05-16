@@ -1,6 +1,7 @@
 // 상위업체 패턴 분석 (② 상위업체 패턴 카드).
 
 import type { PublicWin } from "./types";
+import { MY_BIZNO } from "@/lib/config/myCompany";
 
 // 상위 5개 — 5년 안산∩비방제 데이터 기준 (2026-05 시점)
 export const TOP5_COMPETITORS = [
@@ -10,8 +11,6 @@ export const TOP5_COMPETITORS = [
   { bizno: "1348629134", name: "(주)경안스틸" },
   { bizno: "3228601242", name: "경인이엔지주식회사" },
 ];
-
-const MY_BIZNO = "4958603422"; // 새빛조경
 
 export type CompetitorStats = {
   bizno: string;

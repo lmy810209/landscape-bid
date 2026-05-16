@@ -10,8 +10,8 @@ import {
 
 // === 정책 상수 (모든 값은 설명 가능하도록 명시) ===
 export const BIN_SIZE = 0.003; // 0.3% 단위 히스토그램 bin (2026-04 재튜닝: 0.005 → 0.002 악화 → 0.003 중간값)
-export const RECENT_COUNT = 3; // 최근 N건에 가중치 부여
-export const RECENT_WEIGHT = 2.0; // 최근 N건의 가중치
+export const RECENT_COUNT = 8; // 최근 N건에 가중치 부여 (2026-05: 3→8, 2026년 시계열 이동 반영)
+export const RECENT_WEIGHT = 5.0; // 최근 N건의 가중치 (2026-05: 2.0→5.0, 88%대→90%대 트렌드 극단 가중)
 export const BASE_WEIGHT = 1.0; // 그 외 가중치
 export const RANGE_EXPAND_THRESHOLD = 0.55; // 인접 bin 흡수 기준 (2026-04 v3: 0.8 → 0.6 → 0.55, 포함률만 소폭 개선)
 

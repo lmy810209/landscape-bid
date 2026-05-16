@@ -14,8 +14,8 @@
 import { NextResponse } from "next/server";
 import type { ResultPrefill } from "@/lib/extraction/normalize-result";
 import type { WorkType, ResultStatus } from "@/types/bid";
+import { MY_BIZNO } from "@/lib/config/myCompany";
 
-const MY_BIZNO = "4958603422";
 const NOT_FOUND_RESPONSE = NextResponse.json({ found: false, error: "공고를 찾을 수 없습니다" }, { status: 404 });
 
 const BASE_NOTICE = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService";

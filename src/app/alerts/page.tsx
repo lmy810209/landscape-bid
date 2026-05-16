@@ -161,7 +161,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                 <th className="hidden px-2 py-2 text-right md:table-cell sm:px-3">기초금액</th>
                 <th className="px-2 py-2 text-center sm:px-3">분류</th>
                 <th className="px-2 py-2 text-center sm:px-3">자격</th>
-                <th className="hidden px-2 py-2 text-right lg:table-cell sm:px-3">하한율</th>
+                <th className="hidden px-2 py-2 text-right sm:table-cell sm:px-3">하한율</th>
                 <th className="px-2 py-2 text-center sm:px-3">상태</th>
               </tr>
             </thead>
@@ -252,7 +252,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Searc
                         {n.qual.match ? "가능" : "불가"}
                       </span>
                     </td>
-                    <td className="hidden px-2 py-2 text-right font-mono text-xs lg:table-cell sm:px-3">
+                    <td className="hidden px-2 py-2 text-right font-mono text-xs sm:table-cell sm:px-3">
                       {n.sucsfbidLwltRate ? `${n.sucsfbidLwltRate}%` : "-"}
                     </td>
                     <td className="px-2 py-2 text-center text-xs sm:px-3">

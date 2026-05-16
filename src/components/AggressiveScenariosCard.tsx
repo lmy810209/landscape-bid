@@ -27,10 +27,13 @@ export default function AggressiveScenariosCard({
           <div>{result.insurance_warning}</div>
           {result.effective_cutoff_estimate != null && (
             <div className="mt-1">
-              추정 effective cutoff: <strong>{result.effective_cutoff_estimate.toFixed(2)}%</strong>
+              실측 미달선: <strong>{result.effective_cutoff_estimate.toFixed(2)}%</strong>
               {result.effective_cutoff_amount != null && (
-                <> ({fmtKRW(Math.round(result.effective_cutoff_amount))})</>
+                <> ({fmtKRW(Math.ceil(result.effective_cutoff_amount))})</>
               )}
+              <span className="ml-1 text-[11px] text-amber-800">
+                (5년 안산∩비방제 감액 공고 실측값 — 참고용)
+              </span>
             </div>
           )}
           <div className="mt-1 text-[11px]">
@@ -98,7 +101,7 @@ export default function AggressiveScenariosCard({
       </div>
 
       <p className="mt-2 text-[11px] text-slate-500">
-        ※ 공격형 시뮬은 참고 시나리오. 실제 미달 여부는 추첨번호와 보험료 룰에 따라 달라짐.
+        ※ 공격형 시뮬은 참고 시나리오. 실제 미달 여부는 예정가격 추첨 결과와 보험료 룰에 따라 달라짐.
       </p>
     </div>
   );

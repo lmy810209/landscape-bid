@@ -4,6 +4,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { estimateEffectiveCutoff, isSurvivableAggressive } from "@/lib/marketAnalysis/effectiveCutoff";
 import { isInsuranceNotice } from "@/lib/marketAnalysis/noticeMethods";
+import { MY_BIZNO } from "@/lib/config/myCompany";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function SafeZonePage() {
   const myEntries = await supabase
     .from("public_participants")
     .select("bid_ntce_no")
-    .eq("prcbdr_bizno", "4958603422")
+    .eq("prcbdr_bizno", MY_BIZNO)
     .eq("rmrk", "정상");
   const myInsurance = (myEntries.data ?? []).filter((p) => isInsuranceNotice(p.bid_ntce_no as string)).length;
   const myNormal = (myEntries.data ?? []).length - myInsurance;

@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ResultPrefill } from "@/lib/extraction/normalize-result";
 import BidPriceGuide from "./BidPriceGuide";
-import DrwtRecommend from "./DrwtRecommend";
 
 type Props = {
   onLookup: (data: ResultPrefill) => void;
@@ -167,8 +166,6 @@ export default function BidLookup({ onLookup }: Props) {
         />
       )}
 
-      {/* 추첨번호 추천 — 발주처 매칭 시 */}
-      {success && lastPrefill?.agency && <DrwtRecommend agency={lastPrefill.agency} />}
     </div>
   );
 }

@@ -23,11 +23,22 @@ export type CutoffEstimate = {
   per_notice_min: number | null;
   per_notice_p25: number | null;
   per_notice_median: number | null;
+  // 공고별 cutoff 안정성 지표
+  cutoff_stddev: number | null;  // 표준편차 — 작을수록 cutoff가 안정적
+  cutoff_p75: number | null;     // 75분위 — 보수적 cutoff 기준
+  cutoff_p90: number | null;     // 90분위 — 매우 보수적 cutoff 기준
   // 본인이 88.5% 진입했을 때 미달 비율 추정 (per-notice cutoff > 88.5% 인 공고 비율)
   miss_risk_at_88_5: number | null;
   miss_risk_at_88_0: number | null;
   miss_risk_at_89_0: number | null;
 };
+
+function stddev(values: number[]): number | null {
+  if (values.length < 2) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
 
 function quantile(sorted: number[], p: number): number | null {
   if (sorted.length === 0) return null;
@@ -77,6 +88,9 @@ export function estimateEffectiveCutoff(
     per_notice_min: perNoticeCutoffs[0] ?? null,
     per_notice_p25: quantile(perNoticeCutoffs, 0.25),
     per_notice_median: quantile(perNoticeCutoffs, 0.5),
+    cutoff_stddev: stddev(perNoticeCutoffs),
+    cutoff_p75: quantile(perNoticeCutoffs, 0.75),
+    cutoff_p90: quantile(perNoticeCutoffs, 0.9),
     miss_risk_at_88_5: missRiskAt(88.5),
     miss_risk_at_88_0: missRiskAt(88.0),
     miss_risk_at_89_0: missRiskAt(89.0),

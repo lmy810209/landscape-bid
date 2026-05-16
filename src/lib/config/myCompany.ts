@@ -11,6 +11,9 @@ export const DEFAULT_MY_COMPANY: MyCompany = {
   businessNumber: "495-86-03422",
 };
 
+// API 매칭용 정규화 bizno (하이픈 제거). 직접 import해서 사용.
+export const MY_BIZNO = "4958603422";
+
 const LS_KEY = "myCompany";
 
 export function loadMyCompany(): MyCompany {

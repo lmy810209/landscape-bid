@@ -16,15 +16,23 @@ import { estimateEffectiveCutoff, type ParticipantRow } from "./effectiveCutoff"
 export type RiskLevel = "낮음" | "중간" | "높음";
 export type Position = "공격권" | "정상권" | "미달위험권";
 
+// 순공사비 부적격 하한 (qualification.ts 추출 데이터)
+export type QualificationFloor = {
+  pure_construction_cost: number;
+  purcost_floor_pct: number;
+  floor_price: number; // Math.ceil((pure_construction_cost * purcost_floor_pct) / 100)
+};
+
 export type AggressiveScenario = {
   label: string; // "공격 A" / "공격 B" / "공격 C"
   description: string;
   rate: number; // 사정율 %
-  bid_amount: number; // 예상 투찰금액
+  bid_amount: number; // 예상 투찰금액 (순공사비 하한 캡핑 후)
   margin_to_lower_bound: number; // 낙찰하한선 대비 여유 (원). + = 위, - = 아래
   margin_pct: number; // 같은 것 (%p)
   risk_level: RiskLevel;
   position: Position;
+  floor_capped: boolean; // 순공사비 부적격 하한에 걸려 금액이 올림된 경우 true
 };
 
 export type AggressiveScenariosResult = {
@@ -34,6 +42,8 @@ export type AggressiveScenariosResult = {
   effective_cutoff_estimate: number | null; // 보정된 사정율 cutoff (% — 추정 시에만)
   effective_cutoff_amount: number | null; // 원 단위
   sample_size: number;
+  qual_floor: QualificationFloor | null; // 순공사비 하한 (있을 때만)
+  price_deviation_buffer: number; // 예정가격 편차 안전 버퍼 (%p, 0이면 미적용)
 };
 
 function median(rates: number[]): number | null {
@@ -70,6 +80,8 @@ export function buildAggressiveScenarios(
   ctx: NoticeContext,
   allWins: PublicWin[],
   participants: ParticipantRow[] = [],
+  qualFloor: QualificationFloor | null = null,
+  priceDeviationBuffer: number = 0,
 ): AggressiveScenariosResult {
   const ansanPool = allWins.filter((w) => w.is_ansan && !w.is_bangje && w.sucsfbid_rate != null);
   const noticeKeywords = extractKeywords(ctx.notice_title);
@@ -120,27 +132,25 @@ export function buildAggressiveScenarios(
     effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
   }
 
+  // 보험료 감액 공고 실측 컷오프 중앙값 (5년 안산∩비방제 219건 기준)
+  const INSURANCE_CUTOFF_RATE = 90.20;
+
   if (insuranceDeduction) {
     warning =
-      "이 공고는 보험료 등 합산액 감액 적용 공고입니다. 단순 낙찰하한율보다 실제 미달선이 높게 형성될 수 있습니다.";
-    // 보험료 감액일 때 추정값을 실제 advertised보다 아래로 내리지 않음
-    if (effectiveCutoffRate != null && effectiveCutoffRate < ctx.sucsfbid_lwlt_rate) {
-      effectiveCutoffRate = ctx.sucsfbid_lwlt_rate;
+      "이 공고는 보험료 등 합산액 감액 적용 공고입니다. 실측 미달선 중앙값 90.20% — 89.745% 기준으로 투찰 시 미달 위험 매우 높음.";
+    // 실측 컷오프(90.20%)를 하드 플로어로 적용. op13 추정값이 있어도 90.20% 미만이면 올림.
+    if (effectiveCutoffRate == null || effectiveCutoffRate < INSURANCE_CUTOFF_RATE) {
+      effectiveCutoffRate = INSURANCE_CUTOFF_RATE;
       effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
     }
-    // op13 데이터 없으면 fallback: 매칭 winners 최근 8건 min - 0.05
-    if (effectiveCutoffRate == null) {
-      const recent = [...matched]
-        .sort((a, b) => (b.rl_openg_dt ?? "").localeCompare(a.rl_openg_dt ?? ""))
-        .slice(0, 8)
-        .map((w) => Number(w.sucsfbid_rate))
-        .filter((r) => !isNaN(r));
-      if (recent.length >= 3) {
-        const minRecent = Math.min(...recent);
-        effectiveCutoffRate = Math.max(minRecent - 0.05, ctx.sucsfbid_lwlt_rate);
-        effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
-      }
-    }
+  }
+
+  // 예정가격 편차 버퍼: 예가가 위로 튈 경우를 대비해 effective cutoff에 가산.
+  // recommended_buffer_pct = p75 기준 편차. 예가가 기초금액보다 높게 뽑히면 낙찰하한선도 올라가므로
+  // 그만큼 투찰가를 올려야 미달을 피할 수 있음.
+  if (priceDeviationBuffer > 0 && effectiveCutoffRate != null) {
+    effectiveCutoffRate = effectiveCutoffRate + priceDeviationBuffer;
+    effectiveCutoffAmount = ctx.base_amount * (effectiveCutoffRate / 100);
   }
 
   // 단순 낙찰하한선 (= 기초 × 낙찰하한율)
@@ -153,7 +163,10 @@ export function buildAggressiveScenarios(
     rate: number | null,
   ): AggressiveScenario | null {
     if (rate == null) return null;
-    const bid = Math.round(ctx.base_amount * (rate / 100));
+    const rawBid = Math.ceil(ctx.base_amount * (rate / 100)); // 올림 — 1원 미달 방지
+    // 순공사비 부적격 하한 캡핑: floorPrice 미만이면 강제 올림
+    const bid = qualFloor ? Math.max(rawBid, Math.ceil(qualFloor.floor_price)) : rawBid;
+    const floor_capped = qualFloor ? bid > rawBid : false;
     const margin = bid - effectiveLowerBound;
     const marginPct = (margin / ctx.base_amount) * 100;
     return {
@@ -165,6 +178,7 @@ export function buildAggressiveScenarios(
       margin_pct: marginPct,
       risk_level: classifyRisk(bid, effectiveLowerBound, ctx.base_amount),
       position: classifyPosition(rate, matchedMedian),
+      floor_capped,
     };
   }
 
@@ -183,5 +197,7 @@ export function buildAggressiveScenarios(
     effective_cutoff_estimate: effectiveCutoffRate,
     effective_cutoff_amount: effectiveCutoffAmount,
     sample_size: matched.length,
+    qual_floor: qualFloor,
+    price_deviation_buffer: priceDeviationBuffer,
   };
 }
